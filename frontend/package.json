@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "ng serve",
     "build": "ng build",
@@ -34,6 +36,6 @@
     "karma-chrome-launcher": "^3.2.0",
     "karma-jasmine": "^5.1.0",
     "karma-jasmine-html-reporter": "^2.1.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

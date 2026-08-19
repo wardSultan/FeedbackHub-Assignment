@@ -510,3 +510,39 @@ exactly the kind that survives review and fails in use.
 Everything else in `frontend/` — components, templates, styles, dependency injection — is
 unexecuted. Type-checked with a standalone `tsc` and triaged to nothing but missing-module
 diagnostics, which says the syntax is valid and says nothing about whether it works.
+
+### #29 — The audit found a bug in itself, not in the code
+
+The first version of the route audit reported that `DELETE /requests/:id` was
+administrator-only. It is not — it is author-or-administrator, enforced in the service, and
+the controller has no role decorator on it.
+
+The audit was wrong. It read a handler's decorators with a fixed twelve-line lookahead,
+which ran past the end of that handler and picked up the `@Roles(UserRole.ADMIN)` belonging
+to the *next* one. Bounded to the actual decorator block — from the HTTP decorator to the
+method signature — it reports correctly.
+
+The near-miss is the point. A tool that reports "this endpoint is admin-only" about an
+endpoint that should not be admin-only invites exactly the wrong fix: changing correct code
+to match a broken analysis. The thing that prevented it was reading the source the tool was
+complaining about before believing it.
+
+A second defect in the same tool, found the same way: it reported zero feature-gated routes,
+because `@RequiresFeature(COMMENTS_FEATURE)` passes a constant and the pattern only matched
+a quoted string. Four routes were silently unaudited for their feature gate — the failure
+mode being a *false pass*, which is worse than the first one and would not have announced
+itself at all.
+
+### #30 — Breaking the audit on purpose
+
+Both defects above were found by chance — one because a result looked wrong, one because a
+count looked wrong. That is not a method, so the audit was then broken deliberately in
+three ways to confirm it fails where it should: a rule deleted, a rule claiming an admin
+guard the handler does not have, and a feature gate the code does not apply. Each produced
+the specific error it should.
+
+This project has now accumulated four instances of a check that passed for the wrong reason
+(#7, #16, #21, and the feature-gate false pass above). Running the failing configuration
+deliberately is the only one of the responses that has actually worked. Asserting that a
+check is correct, documenting that checks can be wrong, and being more careful have each
+been tried and have each been followed by another instance.

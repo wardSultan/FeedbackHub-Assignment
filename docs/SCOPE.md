@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 8 — the frontend.** The settings and administration screens,
-> deployment artefacts and the application-level test suite are still to come.
+> **Current status: Phase 9 — testing.** The settings and administration screens and the
+> deployment artefacts are still to come.
 
 ---
 
@@ -34,6 +34,9 @@ ambiguity in the brief was interpreted.
 - **Comments** — create, edit own, delete own or moderate as an administrator, with the
   approval workflow and a visibility rule verified against the database: a pending comment
   is visible to its author and to administrators and to nobody else.
+- **Authorization coverage** — all 39 endpoints in one table, with a dependency-free audit
+  that fails if a route has no rule, a rule has no route, or the decorators disagree with
+  the rule. Verified by breaking it three ways.
 - **Frontend** — Angular 22 with signals and no global store: the application shell,
   runtime configuration, OIDC sign-in, light/dark/system theming without a flash on load,
   and the board itself — search, status and category filters, five sorts, pagination and
