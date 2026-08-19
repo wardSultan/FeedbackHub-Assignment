@@ -82,7 +82,8 @@
           "value": "Passw0rd!demo",
           "temporary": false
         }
-      ]
+      ],
+      "id": "00000000-0000-4000-a000-00000000ad01"
     },
     {
       "username": "user@feedbackhub.local",
@@ -97,7 +98,8 @@
           "value": "Passw0rd!demo",
           "temporary": false
         }
-      ]
+      ],
+      "id": "00000000-0000-4000-a000-000000005e01"
     },
     {
       "username": "second@feedbackhub.local",
@@ -112,7 +114,8 @@
           "value": "Passw0rd!demo",
           "temporary": false
         }
-      ]
+      ],
+      "id": "00000000-0000-4000-a000-000000005e02"
     }
   ]
 }
