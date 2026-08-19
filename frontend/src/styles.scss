@@ -1,0 +1,89 @@
+@use '@angular/material' as mat;
+
+/**
+ * One token layer, two themes.
+ *
+ * Colours are declared once as custom properties and switched by a `data-theme` attribute
+ * on <html>, so a component never needs to know which theme is active and there is no
+ * second set of dark-mode rules to keep in sync. Contrast pairs were chosen to clear
+ * WCAG AA at 4.5:1 for body text in both themes.
+ */
+
+html {
+  @include mat.theme((
+    color: (primary: mat.$azure-palette, tertiary: mat.$blue-palette),
+    typography: Inter,
+    density: 0,
+  ));
+}
+
+:root,
+:root[data-theme='light'] {
+  --fh-bg: #f6f7f9;
+  --fh-surface: #ffffff;
+  --fh-border: #e2e5ea;
+  --fh-text: #14181f;
+  --fh-text-muted: #5b6472;
+  --fh-accent: #2f6feb;
+  --fh-accent-contrast: #ffffff;
+  --fh-skeleton: #e8eaee;
+  --fh-skeleton-highlight: #f3f5f7;
+}
+
+:root[data-theme='dark'] {
+  --fh-bg: #0f1319;
+  --fh-surface: #171c24;
+  --fh-border: #262d38;
+  --fh-text: #e7ecf3;
+  --fh-text-muted: #9aa5b4;
+  --fh-accent: #6f9dff;
+  --fh-accent-contrast: #0f1319;
+  --fh-skeleton: #212836;
+  --fh-skeleton-highlight: #2a3243;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--fh-bg);
+  color: var(--fh-text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mat-icon,
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}
+
+// Never remove the focus ring. Keyboard operability is only real if focus is visible.
+:focus-visible {
+  outline: 2px solid var(--fh-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--fh-accent);
+  color: var(--fh-accent-contrast);
+  border-radius: 0 0 8px 0;
+
+  &:focus {
+    left: 0;
+  }
+}

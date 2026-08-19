@@ -474,3 +474,39 @@ Twice is a pattern rather than an accident, and the fix is not "be more careful"
 that a script which writes files should end by *listing what it wrote*, not by echoing that
 it wrote something. The verification and the claim have to be the same operation, or the
 claim is just a comment.
+
+### #27 — The same shell mistake, a third time, after writing down the fix twice
+
+`cat > src/app/core/http/problem-details.ts` failed because `core/http/` did not exist. The
+script's closing `echo "written"` ran regardless and reported success. This is the third
+occurrence — entries #12 and #26 are the same failure — and #26 states the fix explicitly:
+*a script that writes files should end by listing what it wrote, not by echoing that it
+wrote something.*
+
+Writing the lesson down twice did not apply it. What applied it was changing the command
+itself, so the last line of every file-writing batch is now `find … | sort`. The
+verification and the claim are the same operation, and there is nothing left to remember.
+
+Worth being precise about the failure mode, because it is the general one in this session:
+noticing a recurring error and recording a rule is not the same as removing the
+possibility. The rule lives in a document nobody re-reads mid-task; the `find` lives in the
+thing being run.
+
+### #28 — Writing the frontend so that some of it could still be executed
+
+Angular cannot be compiled here, so the strategy from entries #22 and #25 was applied
+deliberately from the start rather than after the fact: the part of the list feature most
+likely to be wrong — the conversion between URL query parameters and typed filter state —
+was written as pure functions in their own file, with no Angular imports, specifically so
+it could be run.
+
+Twenty-two cases, including the round-trip property (`parse(toParams(q)) === q`) against two
+different default sets. All passed first time, which is a weaker result than the slug
+function in #22 — but the value was in what the shape forced. Writing it as pure functions
+made the absent-versus-empty distinction obvious enough to test; the same logic spread
+across a component's methods would have been checked by reading it, and that distinction is
+exactly the kind that survives review and fails in use.
+
+Everything else in `frontend/` — components, templates, styles, dependency injection — is
+unexecuted. Type-checked with a standalone `tsc` and triaged to nothing but missing-module
+diagnostics, which says the syntax is valid and says nothing about whether it works.

@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 7 — configuration.** The frontend, deployment artefacts and the
-> application-level test suite are still to come.
+> **Current status: Phase 8 — the frontend.** The settings and administration screens,
+> deployment artefacts and the application-level test suite are still to come.
 
 ---
 
@@ -34,6 +34,13 @@ ambiguity in the brief was interpreted.
 - **Comments** — create, edit own, delete own or moderate as an administrator, with the
   approval workflow and a visibility rule verified against the database: a pending comment
   is visible to its author and to administrators and to nobody else.
+- **Frontend** — Angular 22 with signals and no global store: the application shell,
+  runtime configuration, OIDC sign-in, light/dark/system theming without a flash on load,
+  and the board itself — search, status and category filters, five sorts, pagination and
+  optimistic voting, all driven from the URL. Loading, empty and error states are shared
+  components, and the two empty states are distinguished. Request detail with the
+  discussion, and the submission form with server errors mapped onto the fields that caused
+  them.
 - **Configuration** — three-layer resolution (code default, global default, user override)
   as a pure function, exposed through one `GET /bootstrap` that also carries the user,
   feature flags and taxonomy, so the client makes a single call before first render.
@@ -256,6 +263,12 @@ right trade for a setting whose entire purpose is that nothing appears unreviewe
 
 ## Known gaps
 
+- **The frontend has never been compiled.** The build environment cannot reach the npm
+  registry, so no Angular dependency can be installed. Pure logic was executed directly
+  under `node`; everything else is type-checked only. This is the largest unverified
+  surface in the project and the first thing a reviewer should run.
+- The settings and administration screens are not built. Their API endpoints are complete
+  and documented in OpenAPI, so the gap is user interface only.
 - Deleting an account does not disable the corresponding Keycloak account. Doing so
   requires identity-provider admin credentials inside the API, which is a real expansion of
   what the service is trusted with; the local account is inactive and cannot authenticate,

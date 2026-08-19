@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FeedbackHub</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Material+Symbols+Outlined"
+      rel="stylesheet" />
+    <script>
+      // Applies the stored theme before the first paint. Waiting for Angular — let alone
+      // for /bootstrap — means rendering light and then flipping to dark, which is the
+      // single most noticeable defect a dark theme can have.
+      (function () {
+        try {
+          var stored = localStorage.getItem('fh.theme') || 'SYSTEM';
+          var dark =
+            stored === 'DARK' ||
+            (stored === 'SYSTEM' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          /* Private mode blocks localStorage; the default theme is fine. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <fh-root></fh-root>
+  </body>
+</html>
