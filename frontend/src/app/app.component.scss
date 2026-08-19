@@ -1,0 +1,53 @@
+:host { display: block; }
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--fh-surface);
+  border-bottom: 1px solid var(--fh-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--fh-text);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: 1rem;
+
+  a {
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+    color: var(--fh-text-muted);
+    text-decoration: none;
+    font-size: 0.925rem;
+
+    &:hover { background: var(--fh-bg); color: var(--fh-text); }
+    &.active { color: var(--fh-text); font-weight: 600; }
+  }
+}
+
+.spacer { flex: 1; }
+
+.app-main {
+  display: block;
+  padding: 1.5rem 1.25rem 4rem;
+  // Focus target for the skip link; the outline would otherwise draw around the whole page.
+  &:focus { outline: none; }
+}
+
+@media (max-width: 640px) {
+  .app-bar { flex-wrap: wrap; gap: 0.5rem; }
+  .nav { margin-left: 0; order: 3; width: 100%; }
+}

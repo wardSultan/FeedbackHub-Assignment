@@ -1,0 +1,94 @@
+.skeletons {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.skeleton-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--fh-border);
+  border-radius: 12px;
+  background: var(--fh-surface);
+}
+
+.skeleton-vote {
+  width: 3.25rem;
+  height: 3.5rem;
+  border-radius: 8px;
+  flex: none;
+}
+
+.skeleton-body {
+  flex: 1;
+  display: grid;
+  gap: 0.5rem;
+  align-content: center;
+}
+
+.skeleton-line {
+  height: 0.75rem;
+  border-radius: 4px;
+  &.title { height: 1.1rem; width: 55%; }
+  &.short { width: 35%; }
+}
+
+.skeleton-vote,
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--fh-skeleton) 25%,
+    var(--fh-skeleton-highlight) 37%,
+    var(--fh-skeleton) 63%
+  );
+  background-size: 400% 100%;
+  animation: fh-shimmer 1.4s ease infinite;
+}
+
+@keyframes fh-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+// Respect a stated preference for less motion rather than animating regardless.
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-vote,
+  .skeleton-line { animation: none; }
+}
+
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--fh-text-muted);
+}
+
+.state-icon {
+  font-size: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  opacity: 0.6;
+}
+
+.state-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--fh-text);
+}
+
+.state-message {
+  margin: 0 0 0.5rem;
+  max-width: 34rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

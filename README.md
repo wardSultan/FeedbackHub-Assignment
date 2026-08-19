@@ -92,6 +92,18 @@ npm run start:dev
 `GET /health/live` and `GET /health/ready` are unversioned; everything else is served
 under `/api/v1`. Interactive API documentation is at `/api/docs` outside production.
 
+Then the web application:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+It reads `public/config.json` at start-up rather than baking the API and Keycloak URLs into
+the bundle, so the same build runs against any environment — see
+[`docs/DECISIONS.md`](docs/DECISIONS.md), ADR-0020.
+
 ## Running the tests
 
 The schema's guarantees are verified directly against PostgreSQL, below the application
@@ -111,7 +123,14 @@ psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/list-query.
 Unit tests for the application layer (`npm test` in `backend/`) cover environment
 validation and the ownership rules.
 
-Application-level tests arrive with the API.
+The application layer has unit tests for the logic that carries risk rather than for
+coverage: environment validation, the ownership rules, slug derivation, settings
+resolution, and the URL/filter conversion that the board's state depends on.
+
+```bash
+cd backend  && npm test
+cd frontend && npm test
+```
 
 ## What works / what doesn't
 

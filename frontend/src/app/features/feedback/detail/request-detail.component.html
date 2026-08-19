@@ -1,0 +1,86 @@
+<div class="page">
+  <a class="back" routerLink="/requests">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon> Back to the board
+  </a>
+
+  @if (loading()) {
+    <fh-loading-list [count]="1" />
+  } @else if (error()) {
+    <fh-error-state title="Request unavailable" [message]="error()!" (retry)="load()" />
+  } @else if (request(); as item) {
+    <article class="request">
+      <div class="request-head">
+        <h1>{{ item.title }}</h1>
+        <div class="tags">
+          <span class="tag" [style.--tag-color]="item.status.color">{{ item.status.name }}</span>
+          <span class="tag" [style.--tag-color]="item.category.color">{{ item.category.name }}</span>
+        </div>
+      </div>
+
+      <p class="byline">
+        {{ item.author.displayName }} · {{ item.createdAt | date: 'mediumDate' }}
+        @if (item.updatedAt !== item.createdAt) { <span class="muted">· edited</span> }
+      </p>
+
+      <p class="description">{{ item.description }}</p>
+
+      <div class="counts">
+        <span><strong>{{ item.voteCount }}</strong> votes</span>
+        <span><strong>{{ item.commentCount }}</strong> comments</span>
+      </div>
+    </article>
+
+    @if (commentsEnabled()) {
+      <section class="discussion" aria-labelledby="discussion-heading">
+        <h2 id="discussion-heading">Discussion</h2>
+
+        @if (commentError()) {
+          <p class="inline-error" role="alert">{{ commentError() }}</p>
+        }
+
+        @if (comments().length === 0) {
+          <fh-empty-state
+            icon="mode_comment"
+            title="No comments yet"
+            message="Start the discussion — context helps the product team prioritise." />
+        } @else {
+          <ul class="comments">
+            @for (comment of comments(); track comment.id) {
+              <li class="comment" [class.pending]="comment.awaitingApproval">
+                <div class="comment-head">
+                  <strong>{{ comment.author.displayName }}</strong>
+                  <span class="muted">{{ comment.createdAt | date: 'medium' }}</span>
+                  @if (comment.editedAt) { <span class="muted">· edited</span> }
+                  @if (comment.awaitingApproval) {
+                    <span class="badge">Awaiting approval</span>
+                  }
+                  @if (comment.canDelete) {
+                    <button mat-icon-button class="comment-delete"
+                            [attr.aria-label]="'Delete comment by ' + comment.author.displayName"
+                            (click)="deleteComment(comment)">
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  }
+                </div>
+                <p>{{ comment.body }}</p>
+              </li>
+            }
+          </ul>
+        }
+
+        @if (bootstrap.isSignedIn()) {
+          <form class="composer" (ngSubmit)="postComment()">
+            <mat-form-field appearance="outline">
+              <mat-label>Add a comment</mat-label>
+              <textarea matInput rows="3" name="body" [ngModel]="draft()"
+                        (ngModelChange)="draft.set($event)"></textarea>
+            </mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="posting() || !draft().trim()">
+              {{ posting() ? 'Posting…' : 'Post comment' }}
+            </button>
+          </form>
+        }
+      </section>
+    }
+  }
+</div>

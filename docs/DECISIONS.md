@@ -537,3 +537,59 @@ Keycloak admin credentials inside the API — a real expansion of what this serv
 trusted with, for a benefit that is mostly cosmetic given the local account is inactive.
 Listed as unfinished in `SCOPE.md` rather than half-done. Deleting the last administrator
 is refused under the same lock as demotion (ADR-0016).
+
+---
+
+## ADR-0019 — The list's state is the URL
+
+**Context.** The board has a search box, two multi-select filters, a "my requests" toggle,
+five sort options and pagination. That state has to live somewhere.
+
+**Options.** Component signals; a global store; the URL's query parameters.
+
+**Decision.** The URL. Every control writes to it, and the list is derived from what it
+says — never the reverse.
+
+**Why.** It is not a way of avoiding a store, it is a better answer than one. A filtered
+view becomes a link somebody can paste into a chat. The back button steps through filter
+changes the way people expect. A refresh keeps the view. And the entire class of bug where
+component state and the address bar disagree cannot occur, because there is only one copy.
+
+The conversion has to be exact in both directions, which is why `list-query.ts` is pure
+functions over plain objects with no Angular imports — it can be tested, and executed, on
+its own. The property that matters is the round trip: `parse(toParams(q)) === q`, checked
+against both empty defaults and a personalised set.
+
+One distinction carries real weight: **an absent parameter inherits the user's default; an
+empty one overrides it with nothing.** Collapsing those makes "clear filters" impossible
+for anyone who has configured a default filter — the parameter would vanish from the URL
+and the default would silently reapply, which reads as the button being broken.
+
+**Consequences.** Filter changes create history entries, which is usually what people want
+and occasionally means a few back presses to leave the page. Sort keys are part of the
+public surface, so an unrecognised one falls back to the default rather than erroring —
+links outlive releases.
+
+---
+
+## ADR-0020 — Runtime configuration, not build-time environments
+
+**Context.** The frontend needs the API URL and the Keycloak issuer. Angular's convention
+is `environment.ts` files chosen at build time.
+
+**Decision.** A `config.json` fetched before Angular starts, written by the web container's
+entrypoint from environment variables.
+
+**Why.** The brief requires environment-driven configuration and a container that is
+orchestrator-ready. Build-time environments mean one image per environment and a rebuild to
+change a URL, which is the opposite of both. One image runs everywhere and is configured by
+the environment it starts in.
+
+It is fetched *before* `bootstrapApplication` rather than in an initialiser, because the
+values are needed to construct the services that would otherwise be fetching them —
+resolving them first removes a circular dependency instead of working around one.
+
+**Consequences.** One extra request before the application starts, against a static
+same-origin file. If it fails, the failure is written directly into the document: at that
+point there is no Angular error handler and no rendered page, and a blank screen with a
+console error is the worst possible first-run experience.

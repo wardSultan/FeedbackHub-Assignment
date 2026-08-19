@@ -1,0 +1,125 @@
+<div class="board">
+  <div class="board-header">
+    <div>
+      <h1>Feedback</h1>
+      <p class="subtitle">
+        Search before you submit — if the idea is already here, add your vote instead.
+      </p>
+    </div>
+    @if (bootstrap.isSignedIn()) {
+      <a mat-flat-button routerLink="/requests/new">
+        <mat-icon>add</mat-icon>
+        New request
+      </a>
+    }
+  </div>
+
+  <form class="search" (ngSubmit)="applySearch()" role="search">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field">
+      <mat-label>Search requests</mat-label>
+      <input matInput type="search" name="q" [ngModel]="searchText()"
+             (ngModelChange)="searchText.set($event)"
+             placeholder="dark mode, export, notifications…" />
+      <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+    </mat-form-field>
+    <button mat-stroked-button type="submit">Search</button>
+  </form>
+
+  <div class="filters">
+    <mat-chip-listbox aria-label="Filter by status" multiple>
+      @for (status of bootstrap.statuses(); track status.slug) {
+        <mat-chip-option [selected]="query().statuses.includes(status.slug)"
+                         (selectionChange)="toggleStatus(status.slug)">
+          {{ status.name }}
+        </mat-chip-option>
+      }
+    </mat-chip-listbox>
+
+    <mat-chip-listbox aria-label="Filter by category" multiple>
+      @for (category of bootstrap.categories(); track category.slug) {
+        <mat-chip-option [selected]="query().categories.includes(category.slug)"
+                         (selectionChange)="toggleCategory(category.slug)">
+          {{ category.name }}
+        </mat-chip-option>
+      }
+    </mat-chip-listbox>
+
+    <div class="filters-trailing">
+      @if (bootstrap.isSignedIn()) {
+        <button mat-stroked-button (click)="toggleMine()"
+                [attr.aria-pressed]="query().mine">
+          <mat-icon>person</mat-icon>
+          My requests
+        </button>
+      }
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="sort-field">
+        <mat-label>Sort</mat-label>
+        <mat-select [value]="query().sort" (valueChange)="setSort($event)">
+          @for (sort of sorts; track sort) {
+            <mat-option [value]="sort">{{ sortLabels[sort] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (filtered()) {
+        <button mat-button (click)="clearFilters()">Clear filters</button>
+      }
+    </div>
+  </div>
+
+  @if (loading()) {
+    <fh-loading-list [count]="5" />
+  } @else if (error()) {
+    <fh-error-state
+      title="The board could not be loaded"
+      message="The API may still be starting up. Check that docker compose is running."
+      (retry)="fetch()" />
+  } @else if (items().length === 0) {
+    <!-- Two genuinely different situations. Showing "no results" on an empty board tells
+         the user to change filters they never set; showing "be the first" on a filtered
+         board hides the fact that their filters are what emptied it. -->
+    @if (filtered()) {
+      <fh-empty-state
+        icon="filter_alt_off"
+        title="No requests match these filters"
+        message="Try removing a filter or searching for something broader."
+        actionLabel="Clear filters"
+        (action)="clearFilters()" />
+    } @else {
+      <fh-empty-state
+        icon="lightbulb"
+        title="No requests yet"
+        message="Nobody has suggested anything so far. Be the first."
+        [actionLabel]="bootstrap.isSignedIn() ? 'Submit a request' : null" />
+    }
+  } @else {
+    <p class="result-count" aria-live="polite">
+      {{ result()?.total }} request{{ result()?.total === 1 ? '' : 's' }}
+    </p>
+
+    <ul class="request-list">
+      @for (request of items(); track request.id) {
+        <li>
+          <fh-request-card [request]="request" />
+        </li>
+      }
+    </ul>
+
+    @if (query().page > 1 || result()?.hasNext) {
+      <nav class="pager" aria-label="Pagination">
+        <button mat-stroked-button [disabled]="query().page === 1"
+                (click)="goToPage(query().page - 1)">
+          <mat-icon>chevron_left</mat-icon>
+          Previous
+        </button>
+        <span>Page {{ query().page }}</span>
+        <button mat-stroked-button [disabled]="!result()?.hasNext"
+                (click)="goToPage(query().page + 1)">
+          Next
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </nav>
+    }
+  }
+</div>
