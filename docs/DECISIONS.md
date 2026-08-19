@@ -262,3 +262,41 @@ not by a failing build — there is no Prisma binary available in the build envi
 API layer instead. Acceptable: this is a UI preference blob, not a place where integrity
 matters. The important invariant — `NULL` means inherit — is preserved and is the thing the
 resolution logic depends on.
+
+---
+
+## ADR-0011 — Dependency majors: the newest release is not automatically the right one
+
+**Context.** Two dependencies had shipped a major release that changes how the rest of the
+stack has to be built. Both were checked against the registry rather than recalled, which
+is how the problem surfaced at all.
+
+**Prisma.** The current release is 7.x. Version 7 is a hard break: ESM only (`"type":
+"module"` across the backend), mandatory driver adapters, a new `prisma-client` generator
+with a required output path, and a changed import path. The previous line is 6.19.2.
+
+**TypeScript.** The current release is 7.x, the native compiler port. But `ts-jest`
+declares `typescript >=4.3 <7`, so TypeScript 7 breaks the test runner outright — and
+`@nestjs/cli` itself depends on TypeScript 5.9.3, which is the combination NestJS is
+actually tested against.
+
+**Decision.** Prisma `^6.19.2` and TypeScript `^5.9.3`. The backend stays CommonJS.
+
+**Why.** Neither newer major buys this project anything it needs. Prisma 7's headline gain
+is a faster Rust-free client, which is irrelevant at the query volumes of an internal
+feedback board, and its cost is pulling the entire backend to ESM — where NestJS, Jest and
+ts-jest are all more awkward. TypeScript 7's cost is losing the test runner.
+
+The deciding factor is the build environment: the npm registry is unreachable here, so
+nothing can be compiled or run before it is handed over. Choosing the path with the fewest
+unknowns is worth more than choosing the newest version, because there is no build to
+catch the difference.
+
+**Consequences.** One major behind on both, which is a deliberate choice with a stated
+reason rather than a stale lockfile. Revisit Prisma 7 when the backend has a reason to be
+ESM anyway; revisit TypeScript 7 when ts-jest supports it.
+
+*Verified against the npm registry rather than recalled: `@nestjs/core` 11.2.1,
+`@nestjs/config` 4.0.4, `@nestjs/swagger` 11.4.6 (peer `^11.0.1`), `@nestjs/cli` 11.0.24,
+`prisma` 7.9.1 latest / 6.19.2 prev, `typescript` 7.0.2 latest / 5.9.3 in the Nest CLI,
+`ts-jest` 29.4.12 (peer `typescript >=4.3 <7`), `jest` 30.4.2, `zod` 4.4.3.*

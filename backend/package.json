@@ -1,0 +1,85 @@
+{
+  "name": "feedbackhub-api",
+  "version": "0.1.0",
+  "description": "FeedbackHub API \u2014 internal product feedback board",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\" --max-warnings 0",
+    "format": "prettier --write \"{src,test}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate:dev": "prisma migrate dev --create-only",
+    "db:check": "psql -qtA -v ON_ERROR_STOP=1 -f prisma/checks/schema-invariants.sql && ./prisma/checks/concurrency.sh"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/platform-express": "^11.2.1",
+    "@nestjs/swagger": "^11.4.6",
+    "@prisma/client": "^6.19.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "helmet": "^8.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.2.1",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "@types/supertest": "^6.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^10.0.0",
+    "jest": "^30.4.2",
+    "prettier": "^3.4.2",
+    "prisma": "^6.19.2",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.19.0"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ]
+    },
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.module.ts",
+      "!src/main.ts"
+    ],
+    "testEnvironment": "node"
+  }
+}
