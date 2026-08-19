@@ -85,6 +85,7 @@ cp .env.example .env      # adjust DATABASE_URL if needed
 npm install
 npm run prisma:generate
 npm run prisma:migrate
+psql -d feedbackhub -f prisma/seed.sql   # demo content, safe to re-run
 npm run start:dev
 ```
 
@@ -100,9 +101,15 @@ layer where no application bug can reach:
 # 32 invariant checks — constraints, triggers, cascades, search. Rolls back cleanly.
 psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/schema-invariants.sql
 
+# 24 checks over the list query: filters, sorts, search, pagination, per-viewer state.
+psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/list-query.sql
+
 # Vote uniqueness and counter correctness under genuine concurrency.
 ./backend/prisma/checks/concurrency.sh
 ```
+
+Unit tests for the application layer (`npm test` in `backend/`) cover environment
+validation and the ownership rules.
 
 Application-level tests arrive with the API.
 

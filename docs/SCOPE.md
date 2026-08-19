@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 2 — authentication and authorization.** The domain modules and
-> the frontend are still to come.
+> **Current status: Phase 3 — feedback requests.** Voting, comments, admin configuration
+> and the frontend are still to come.
 
 ---
 
@@ -22,6 +22,13 @@ ambiguity in the brief was interpreted.
   public opt-out, and ownership rules as pure functions with unit tests.
 - **Local stack** — Docker Compose for PostgreSQL and Keycloak, with a healthcheck verified
   against a running instance rather than assumed.
+- **Feedback requests** — create, read, edit and soft-delete, with the list supporting
+  status and category filters, five sorts, full-text search with relevance ranking, "my
+  requests", pagination, and pinned-first ordering under every sort. Content editing,
+  status changes and pinning are three endpoints with three different authorization rules
+  rather than one endpoint with a permission matrix inside.
+- **Demo data** — an idempotent seed attributing content to the same accounts the Keycloak
+  realm creates, so signing in lands on an account that already owns requests.
 - **API foundation** — NestJS application skeleton: environment validation that refuses to
   start on bad configuration, a Prisma module, RFC 9457 problem-details error handling,
   field-level validation errors, mass-assignment protection, security headers, an explicit

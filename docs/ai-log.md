@@ -246,3 +246,51 @@ Found by grepping every `ADR-` reference in the source against the headings in
 `DECISIONS.md`, which takes one command and is worth repeating before each commit. A
 confident, specific, wrong citation is worse than no citation: it sends a reader to the
 wrong page and quietly undermines trust in every other reference in the codebase.
+
+### #15 — The list query, developed against real data rather than reasoned about
+
+The list endpoint is the most intricate SQL in the project and the easiest to get subtly
+wrong, so it was built the other way round: seed realistic data first, develop the query
+interactively against it, then write the TypeScript around a statement already known to
+work. `prisma/checks/list-query.sql` keeps that as 24 assertions.
+
+The seed itself is worth a note. Keycloak generates user ids, and the OIDC `sub` claim is
+the key the application provisions users by — so demo content authored by invented user
+rows would have been orphaned the moment somebody actually signed in, silently creating a
+second account for the same person. Fixed by giving the realm's users fixed ids, verified
+by signing in as each of the three accounts and decoding the returned token to confirm the
+`sub` matches what the seed uses.
+
+### #16 — A check that could never fail
+
+While writing the list query suite, one assertion came out as:
+
+    SELECT pg_temp.assert(
+        (SELECT min(created_at) = max(created_at) FROM (SELECT 1 AS created_at) t) IS NOT NULL,
+        'oldest and newest disagree about the second row');
+
+It is a tautology. The subquery is a one-row literal, so the comparison is always true and
+never NULL; the assertion passes regardless of what the query does. It sat in a green run
+of 25 checks looking exactly like the other 24.
+
+Noticed while re-reading the suite rather than from any failure — which is the point.
+Deleted rather than repaired, because the assertion immediately after it ("oldest and
+newest produce different orderings") is the real test of the same property.
+
+This is the second instance in this project of the same failure mode, after entry #7: a
+test that is green for a reason unrelated to the behaviour it names. Green suites earn less
+trust than they appear to; the useful question about a new assertion is not "does it pass"
+but "what would make it fail".
+
+### #17 — What is verified here, and what is not
+
+Verified against a real PostgreSQL: the schema and its invariants, the seed and its
+idempotency, and the list query across the filter/sort/search/pagination matrix. Verified
+against a real Keycloak: the realm import, the token claims, and the healthcheck.
+
+Not verified, and worth naming precisely rather than leaving implied: the TypeScript has
+still never been compiled, so Prisma's binding of a JavaScript array to a
+`text[]` parameter in the raw query is assumed rather than observed. The SQL pattern itself
+was tested with real NULL and array binds through psql, so the risk is confined to the
+client's parameter handling — but it is the kind of assumption that should be checked by
+the first `npm run build`, not discovered later.

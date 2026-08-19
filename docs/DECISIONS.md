@@ -352,3 +352,37 @@ should be stated so it does not read as an oversight.
 - **Admins may delete others' content but never edit its text.** The brief grants triage and
   moderation, never impersonation, and the difference is the gap between "an admin removed
   my comment" and "an admin rewrote my comment and left my name on it".
+
+---
+
+## ADR-0013 — The list query is raw SQL; everything else goes through Prisma
+
+**Context.** The list endpoint has to filter by status and category, restrict to the
+caller's own requests, run a full-text search, sort five ways, keep pinned requests at the
+top under *every* sort, tell the viewer which requests they have voted on, and return a
+total for pagination.
+
+**Options.** Assemble it with Prisma's query builder; or write it as one SQL statement.
+
+**Decision.** One raw SQL statement, in `FeedbackRepository`. Prisma's generated client is
+used for everything else in the module.
+
+**Why.** Three of those requirements are awkward or impossible through the builder:
+`ts_rank` relevance ordering, an ORDER BY whose leading terms are constant while its later
+terms depend on a parameter, and a window-function total in the same round trip. Built
+through the query builder this becomes a pile of conditional fragments whose emergent
+ordering nobody can read. Written out it is one statement that says what it does.
+
+The decisive argument is verifiability. `prisma/checks/list-query.sql` runs the same
+statement against a real database across the filter, sort, search and pagination matrix —
+24 assertions, including that a pinned request still leads when sorting by votes, that
+`has_voted` is computed per viewer rather than globally, that a soft-deleted request
+disappears, and that search survives SQL metacharacters. A query assembled from fragments
+could not be checked that directly.
+
+**Consequences.** Column names are strings rather than generated types, so a schema rename
+that misses this file fails at runtime rather than at compile time — mitigated by the check
+suite, which fails immediately if a column disappears. Every value including the sort key
+is a bound parameter, so nothing from the request reaches the statement as SQL. The check
+file and the repository hold the same query in two places and have to be changed together;
+both say so.
