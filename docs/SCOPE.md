@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 6 — the administrative surface.** Application and user settings
-> and the frontend are still to come.
+> **Current status: Phase 7 — configuration.** The frontend, deployment artefacts and the
+> application-level test suite are still to come.
 
 ---
 
@@ -34,6 +34,13 @@ ambiguity in the brief was interpreted.
 - **Comments** — create, edit own, delete own or moderate as an administrator, with the
   approval workflow and a visibility rule verified against the database: a pending comment
   is visible to its author and to administrators and to nobody else.
+- **Configuration** — three-layer resolution (code default, global default, user override)
+  as a pure function, exposed through one `GET /bootstrap` that also carries the user,
+  feature flags and taxonomy, so the client makes a single call before first render.
+  Administrators edit global settings and toggle flags; users set and clear their own
+  overrides, where clearing returns the setting to the current global.
+- **Account deletion** — anonymises the row rather than cascading, so other people's
+  threads and vote counts survive. Refused for the last administrator.
 - **Administration** — taxonomy management with retire-versus-delete and an atomic default
   status swap, a comment moderation queue, and user role changes with both lockout routes
   closed. Grouped under `/admin` as routes rather than as a module.
@@ -246,6 +253,16 @@ you actually wanted to say. The cost is that a typo fix re-enters the queue, whi
 right trade for a setting whose entire purpose is that nothing appears unreviewed.
 
 ---
+
+## Known gaps
+
+- Deleting an account does not disable the corresponding Keycloak account. Doing so
+  requires identity-provider admin credentials inside the API, which is a real expansion of
+  what the service is trusted with; the local account is inactive and cannot authenticate,
+  so the practical effect is limited. See ADR-0018.
+- The registration policy (`OPEN` / `INVITE_ONLY` / `DOMAIN_RESTRICTED`) is stored and
+  editable but not yet enforced at provisioning time.
+- Submission rate limits are stored and editable but not yet applied to request creation.
 
 ## Environment assumptions
 

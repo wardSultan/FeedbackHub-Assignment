@@ -151,6 +151,65 @@ export class UsersService {
     });
   }
 
+  async updateProfile(
+    userId: string,
+    data: { displayName?: string; avatarUrl?: string | null },
+  ): Promise<User> {
+    // Only these two fields. `role`, `email` and `idpSubject` are not in the DTO and are
+    // stripped by the global whitelist before this is called, so a body carrying them is
+    // rejected rather than quietly ignored.
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { displayName: data.displayName, avatarUrl: data.avatarUrl },
+    });
+  }
+
+  /**
+   * Account deletion anonymises rather than removes.
+   *
+   * Cascading would delete the user's requests and comments, taking with them a discussion
+   * other people contributed to and votes other people cast. The row is kept so every
+   * foreign key stays valid and their content renders as "Deleted user".
+   *
+   * The email is rewritten rather than nulled because the column is NOT NULL and unique,
+   * and because it must not collide if the same person is later provisioned again.
+   *
+   * The identity-provider account is *not* disabled here — that needs Keycloak admin
+   * credentials in the API, which is a meaningful expansion of what this service is
+   * trusted with. Recorded as unfinished in SCOPE.md rather than half-done.
+   */
+  async deleteOwnAccount(principal: Principal): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      if (principal.role === UserRole.ADMIN) {
+        const admins = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM users
+           WHERE role = 'ADMIN' AND deleted_at IS NULL AND is_active
+           FOR UPDATE
+        `;
+
+        if (admins.length <= 1) {
+          throw new ConflictException(
+            'You are the last administrator. Promote someone else before deleting your account.',
+          );
+        }
+      }
+
+      await tx.user.update({
+        where: { id: principal.userId },
+        data: {
+          email: `deleted-${principal.userId}@invalid`,
+          displayName: 'Deleted user',
+          avatarUrl: null,
+          isActive: false,
+          deletedAt: new Date(),
+          role: UserRole.USER,
+        },
+      });
+    });
+
+    this.logger.log(`Account ${principal.userId} anonymised at the owner's request`);
+  }
+
   findById(id: string): Promise<User | null> {
     return this.prisma.user.findFirst({ where: { id, deletedAt: null } });
   }
