@@ -82,6 +82,53 @@ export class CommentsService {
     };
   }
 
+  /** The moderation queue. Ordered oldest first: the longest wait is dealt with first. */
+  async listPending(
+    principal: Principal,
+    paging: ListCommentsDto,
+  ): Promise<{ items: CommentView[]; page: number; pageSize: number; total: number }> {
+    const where: Prisma.CommentWhereInput = {
+      moderationStatus: CommentModerationStatus.PENDING,
+      deletedAt: null,
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.comment.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (paging.page - 1) * paging.pageSize,
+        take: paging.pageSize,
+        include: { author: { select: { id: true, displayName: true, avatarUrl: true } } },
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toView(row, principal)),
+      page: paging.page,
+      pageSize: paging.pageSize,
+      total,
+    };
+  }
+
+  async moderate(
+    id: string,
+    principal: Principal,
+    status: CommentModerationStatus,
+  ): Promise<CommentView> {
+    await this.requireExisting(id);
+
+    // The comment_count trigger reacts to this transition, so approving or rejecting
+    // adjusts the visible count without the application touching it.
+    const updated = await this.prisma.comment.update({
+      where: { id },
+      data: { moderationStatus: status },
+      include: { author: { select: { id: true, displayName: true, avatarUrl: true } } },
+    });
+
+    return this.toView(updated, principal);
+  }
+
   async create(
     requestId: string,
     principal: Principal,

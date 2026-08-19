@@ -3,6 +3,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { TaxonomyModule } from './modules/taxonomy/taxonomy.module';
 import { UsersModule } from './modules/users/users.module';
 import { VotesModule } from './modules/votes/votes.module';
 import { PlatformModule } from './platform/platform.module';
@@ -21,6 +22,7 @@ import { PlatformModule } from './platform/platform.module';
     SettingsModule,
     AuthModule,
     UsersModule,
+    TaxonomyModule,
     FeedbackModule,
     VotesModule,
     CommentsModule,

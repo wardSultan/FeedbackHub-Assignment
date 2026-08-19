@@ -1,9 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { User, UserRole } from '@prisma/client';
 import type { Env } from '../../platform/config/env';
 import { PrismaService } from '../../platform/prisma/prisma.service';
-import type { TokenClaims } from '../auth/principal';
+import type { Principal, TokenClaims } from '../auth/principal';
+import type { ListUsersDto } from './admin-users.controller';
+
+export interface AdminUserView {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: Date;
+}
 
 @Injectable()
 export class UsersService {
@@ -49,6 +59,96 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async list(
+    query: ListUsersDto,
+  ): Promise<{ items: AdminUserView[]; page: number; pageSize: number; total: number }> {
+    const where = {
+      deletedAt: null,
+      ...(query.q
+        ? {
+            OR: [
+              { displayName: { contains: query.q, mode: 'insensitive' as const } },
+              { email: { contains: query.q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { items: rows, page: query.page, pageSize: query.pageSize, total };
+  }
+
+  /**
+   * Changing a role, with the two ways an administrator can lock everybody out closed off.
+   *
+   * An administrator cannot demote themselves — the usual accident — and the last
+   * remaining administrator cannot be demoted by anyone. The second check runs inside a
+   * transaction that locks the administrator rows with SELECT ... FOR UPDATE, because
+   * two administrators demoting each other simultaneously would otherwise both read a
+   * count of two, both pass the check, and leave the board with none.
+   */
+  async setRole(id: string, principal: Principal, role: UserRole): Promise<AdminUserView> {
+    if (id === principal.userId && role !== UserRole.ADMIN) {
+      throw new BadRequestException('You cannot remove your own administrator access.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const target = await tx.user.findFirst({ where: { id, deletedAt: null } });
+
+      if (!target) {
+        throw new NotFoundException('That user does not exist.');
+      }
+
+      if (target.role === UserRole.ADMIN && role !== UserRole.ADMIN) {
+        const admins = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM users
+           WHERE role = 'ADMIN' AND deleted_at IS NULL AND is_active
+           FOR UPDATE
+        `;
+
+        if (admins.length <= 1) {
+          throw new ConflictException(
+            'The last administrator cannot be demoted. Promote someone else first.',
+          );
+        }
+      }
+
+      const updated = await tx.user.update({
+        where: { id },
+        data: { role },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      this.logger.log(`${principal.email} set ${updated.email} to ${role}`);
+
+      return updated;
+    });
   }
 
   findById(id: string): Promise<User | null> {

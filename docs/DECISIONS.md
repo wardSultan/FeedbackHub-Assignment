@@ -412,3 +412,51 @@ deliberately uncached: a runtime toggle whose whole purpose is to take effect im
 should not have a window in which an administrator has flipped it and the application has
 not noticed. If a hot path ever justifies a cache, that is the point to measure and add
 one — not before.
+
+---
+
+## ADR-0015 — Admin is a route grouping, not a module
+
+**Context.** Every domain gains an administrative surface: taxonomy management, comment
+moderation, role changes, application settings. The obvious structure is an `admin` module.
+
+**Decision.** There is no admin module. Admin operations live in the module that owns the
+data — taxonomy in `taxonomy`, moderation in `comments`, roles in `users` — and are grouped
+under an `/admin/**` route prefix guarded uniformly.
+
+**Why.** "Admin" is an *audience*, not a bounded context. An admin module that also knows
+how categories work would hold the same rules as the taxonomy module, differing only in who
+may call them — and two copies of a rule that must agree is how authorization bugs are
+made. Routes are a presentation concern; modules are a domain concern, and keeping them
+separate is what stops the route prefix from becoming an architectural boundary it was
+never meant to be.
+
+**Consequences.** Each module owns two controllers where it has an admin surface. The
+`@Roles(ADMIN)` guard sits on the controller class rather than on individual methods, so a
+new admin endpoint is protected by where it is declared rather than by remembering a
+decorator.
+
+---
+
+## ADR-0016 — Two lockouts closed with a row lock, not a check
+
+**Context.** Demoting administrators can leave the board with none, and no way to appoint
+one — an unrecoverable state short of editing the database by hand.
+
+**Decision.** Administrators cannot demote themselves. Beyond that, the last remaining
+administrator cannot be demoted by anyone, enforced inside a transaction that takes
+`SELECT ... FOR UPDATE` on the administrator rows before counting them.
+
+**Why.** The self-demotion rule catches the common accident. The row lock catches the
+uncommon one that a plain count cannot: two administrators demoting each other at the same
+moment both read a count of two, both conclude they are not the last, and both proceed.
+
+This is not hypothetical reasoning. The check in `prisma/checks/concurrency.sh` runs exactly
+that race, and removing `FOR UPDATE` from it is the negative control — with the lock,
+exactly one demotion succeeds and one administrator remains; without it, both succeed and
+**zero** administrators remain. Both outcomes were observed against a real database before
+this was written down.
+
+**Consequences.** Role changes serialise against each other, which at the frequency
+administrators are appointed costs nothing. The same pattern will be needed for account
+deletion, since deleting the last administrator is the same lockout by another route.

@@ -386,3 +386,54 @@ every assertion scoped to data it created itself — rather than noticing.
 It is also the strongest argument in this project for running the suite in more than one
 state. A check suite that has only ever been run against one database is not a suite, it
 is a snapshot.
+
+### #22 — A pure function, actually executed, was wrong
+
+Category and status slugs are derived from the display name. The generated implementation
+looked unremarkable:
+
+    name.toLowerCase().normalize('NFKD')
+        .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+
+`toSlug` is pure and depends on nothing, so unlike the rest of the TypeScript in this
+project it could be pasted into `node -e` and run. It fails: NFKD decomposes `Ü` into a
+base letter plus a combining diaeresis, and the combining mark is neither a letter nor a
+number, so it becomes a separator. `Ünicode Wörter` slugs to `u-nicode-wo-rter`.
+
+The fix is one line — strip `\p{Mark}` after normalising — but the interesting part is that
+the bug is invisible on ASCII input. Every obvious test case passes. It would have reached
+production and then produced broken filter URLs for the first administrator who named a
+category in a language with accents.
+
+Lesson worth generalising while the toolchain is unavailable: extract the logic that *can*
+be run without dependencies, and run it. Not everything in this codebase can be, but more
+of it can than the "nothing compiles" framing suggests.
+
+### #23 — Proving the lock does the work
+
+The last-administrator rule is the kind of check that looks obviously correct and is
+obviously correct only in a single session. Two administrators demoting each other
+simultaneously both read a count of two, both conclude they are not the last, and both
+proceed.
+
+Rather than assert that `SELECT ... FOR UPDATE` fixes it, both versions were run against a
+real database with two genuinely concurrent connections. With the lock: one demotion
+succeeds, one is refused, one administrator remains. Without it: both succeed and **zero**
+administrators remain — a board that can never appoint another administrator.
+
+The negative control is what makes the check worth having. Two earlier entries in this log
+(#7, #16, #21) are all variants of "an assertion that passes for the wrong reason"; running
+the failing configuration deliberately is the cheapest defence against writing another one.
+
+### #24 — The check failed for the wrong reason, and that was fine
+
+Folding the last-administrator race into the check suite, the first run reported two
+administrators surviving instead of one. Not a locking failure: the shell argument inside
+the SQL heredoc had been written `\$1` rather than `$1`, so it never expanded, the UPDATE
+matched no rows, and both transactions committed having changed nothing.
+
+Worth recording because of the direction it failed in. The escaping mistake made the check
+report a *failure* rather than a false pass — the UPDATE did nothing, so no administrator
+was demoted, so the count stayed at two and the assertion tripped. Had the same mistake
+been made in the opposite direction it would have sat green and untested indefinitely,
+which is precisely what happened in entries #7 and #16.

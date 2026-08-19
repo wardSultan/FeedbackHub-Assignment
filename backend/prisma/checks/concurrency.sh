@@ -26,9 +26,19 @@ export PGHOST PGUSER PGPASSWORD PGDATABASE
 CONCURRENCY="${CONCURRENCY:-20}"
 q() { psql -qtA -v ON_ERROR_STOP=1 -c "$1"; }
 
+# Section 4 temporarily demotes the real administrators so that exactly two exist during
+# the test. They are restored here, and the trap makes that hold even if the script is
+# interrupted partway.
+SAVED_ADMINS=""
+
 cleanup() {
   q "DELETE FROM feedback_requests WHERE title = 'Concurrency check fixture';" >/dev/null
   q "DELETE FROM users WHERE idp_subject LIKE 'concurrency-check-%';" >/dev/null
+  q "DELETE FROM users WHERE idp_subject LIKE 'last-admin-check-%';" >/dev/null
+  if [[ -n "${SAVED_ADMINS}" ]]; then
+    q "UPDATE users SET role = 'ADMIN' WHERE id IN (${SAVED_ADMINS});" >/dev/null
+    SAVED_ADMINS=""
+  fi
 }
 trap cleanup EXIT
 cleanup
@@ -111,5 +121,56 @@ if [[ "${count}" != "0" ]]; then
   exit 1
 fi
 echo "   ok  withdrawing three times leaves no vote and does not go negative"
+
+# -- 4. The last administrator cannot be demoted -------------------------------
+# Two administrators demoting each other at the same moment both read a count of two,
+# both conclude they are not the last, and both proceed — leaving the board with no
+# administrator and no way to appoint one. SELECT ... FOR UPDATE on the administrator
+# rows is what serialises them.
+#
+# Removing FOR UPDATE from the block below makes this check fail with zero administrators
+# remaining, which is the negative control for it.
+echo "4. two administrators demoting each other simultaneously"
+
+SAVED_ADMINS=$(q "SELECT string_agg(quote_literal(id), ',') FROM users
+                   WHERE role = 'ADMIN' AND deleted_at IS NULL AND is_active;")
+q "UPDATE users SET role = 'USER' WHERE role = 'ADMIN';" >/dev/null
+q "INSERT INTO users (idp_subject, email, display_name, role) VALUES
+     ('last-admin-check-1','lac1@example.test','Admin One','ADMIN'),
+     ('last-admin-check-2','lac2@example.test','Admin Two','ADMIN');" >/dev/null
+
+demote() {
+  psql -qtA <<SQL >/dev/null 2>&1
+BEGIN;
+SELECT pg_sleep(0.2);
+DO \$\$
+DECLARE n INT;
+BEGIN
+    SELECT count(*) INTO n FROM (
+        SELECT id FROM users
+         WHERE role = 'ADMIN' AND deleted_at IS NULL AND is_active
+         FOR UPDATE
+    ) locked;
+    IF n <= 1 THEN
+        RAISE EXCEPTION 'refused: last administrator';
+    END IF;
+    UPDATE users SET role = 'USER' WHERE idp_subject = '$1';
+END;
+\$\$;
+COMMIT;
+SQL
+}
+
+demote last-admin-check-1 &
+demote last-admin-check-2 &
+wait
+
+remaining=$(q "SELECT count(*) FROM users
+                WHERE role = 'ADMIN' AND deleted_at IS NULL AND is_active;")
+if [[ "${remaining}" != "1" ]]; then
+  echo "   FAILED: expected exactly one administrator to survive, got ${remaining}" >&2
+  exit 1
+fi
+echo "   ok  one demotion succeeded, one was refused, one administrator remains"
 
 echo "Concurrency and idempotency checks passed."

@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 5 — comments.** Admin configuration, user settings and the
-> frontend are still to come.
+> **Current status: Phase 6 — the administrative surface.** Application and user settings
+> and the frontend are still to come.
 
 ---
 
@@ -34,6 +34,9 @@ ambiguity in the brief was interpreted.
 - **Comments** — create, edit own, delete own or moderate as an administrator, with the
   approval workflow and a visibility rule verified against the database: a pending comment
   is visible to its author and to administrators and to nobody else.
+- **Administration** — taxonomy management with retire-versus-delete and an atomic default
+  status swap, a comment moderation queue, and user role changes with both lockout routes
+  closed. Grouped under `/admin` as routes rather than as a module.
 - **Feature flags** — read from the database and enforced by a route guard, so disabling a
   feature refuses the request rather than only hiding the control.
 - **Demo data** — an idempotent seed attributing content to the same accounts the Keycloak
