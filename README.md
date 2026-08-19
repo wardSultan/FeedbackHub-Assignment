@@ -8,12 +8,14 @@ status, curating categories, and moderating content.
 The point is to stop the same suggestion arriving five times by email, and to make it
 visible what is actually being worked on.
 
-> **Status: Phase 0 — project foundation.** No application code yet.
-> See [`docs/SCOPE.md`](docs/SCOPE.md) for what is built, what is not, and why.
+> The API is feature-complete and the board is built. Deployment artefacts and the
+> settings and administration screens are not. See
+> [`docs/SCOPE.md`](docs/SCOPE.md) for the full account, including what has and has not
+> been verified.
 
 ---
 
-## Planned stack
+## Stack
 
 | Layer | Choice |
 |---|---|
@@ -29,14 +31,18 @@ Rationale for each choice lives in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 ## Repository layout
 
 ```text
-backend/    NestJS API (added in Phase 1)
-frontend/   Angular application (added in Phase 8)
-infra/      Dockerfiles, compose, Kubernetes manifests (added in Phase 10)
-docs/       Decisions, scope, AI collaboration write-up
+backend/            NestJS API
+  prisma/           Schema, migrations, seed, and database-level checks
+  src/platform/     Configuration, database access, error handling, health probes
+  src/modules/      Domain modules — auth, users, taxonomy, feedback, votes,
+                    comments, settings
+  test/             Authorization matrix and its audit
+frontend/           Angular application
+  src/app/core/     Runtime config, OIDC auth, theme, API clients
+  src/app/features/ Feature areas, lazily loaded
+infra/              Keycloak realm and database bootstrap
+docs/               Decisions, scope, AI collaboration write-up
 ```
-
-Directories are created when they receive real content rather than up front as empty
-placeholders.
 
 ## Requirements
 
@@ -45,20 +51,11 @@ placeholders.
 
 ## Running it
 
-Not yet runnable end to end — the API lands next. This section will carry the verified
-one-command quick start, and will be checked from a clean clone before it is written.
+Three steps: the backing services, the API, then the web application.
 
-The database schema, however, is complete and independently runnable:
-
-```bash
-createdb feedbackhub
-psql -d feedbackhub -v ON_ERROR_STOP=1 \
-  -f backend/prisma/migrations/20260819120000_init/migration.sql
-```
-
-The migration creates the schema and the reference data the application cannot start
-without: the app settings row, the default statuses and categories, and the feature
-flags. Demo content is separate and arrives with the seed script.
+> The API and web application have not been compiled in the environment this was built in —
+> the npm registry was unreachable. Expect `npm install` to be the first real test of them,
+> and see [`docs/SCOPE.md`](docs/SCOPE.md) for the full account.
 
 Start the backing services first — PostgreSQL and Keycloak, with the realm imported:
 
@@ -76,8 +73,9 @@ realm arrives pre-configured with the SPA client and three demo accounts:
 | `user@feedbackhub.local` | `Passw0rd!demo` | Ordinary user |
 | `second@feedbackhub.local` | `Passw0rd!demo` | A second user, for checking that one user cannot edit another's content |
 
-Then the API — which has not yet been compiled here, see
-[`docs/SCOPE.md`](docs/SCOPE.md) for why:
+The migration creates the schema plus the reference data the application cannot start
+without — the settings row, the default statuses and categories, and the feature flags.
+Demo content is separate, in `prisma/seed.sql`, and is safe to re-run.
 
 ```bash
 cd backend
@@ -120,9 +118,6 @@ psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/list-query.
 ./backend/prisma/checks/concurrency.sh
 ```
 
-Unit tests for the application layer (`npm test` in `backend/`) cover environment
-validation and the ownership rules.
-
 The application layer has unit tests for the logic that carries risk rather than for
 coverage: environment validation, the ownership rules, slug derivation, settings
 resolution, and the URL/filter conversion that the board's state depends on.
@@ -141,9 +136,69 @@ that needs nothing installed — it reads the source — and fails if any endpoi
 cd backend && npx tsx test/route-audit.ts
 ```
 
+## Where to look first
+
+A reviewer with forty minutes will not find the parts worth seeing by browsing. These are
+the five that carry the most thought:
+
+1. **`backend/prisma/migrations/…/migration.sql`** — the two invariants the brief names by
+   name are database objects, not application checks. One vote per user is the composite
+   primary key on `votes`; the derived counts are maintained by triggers using delta
+   arithmetic. `prisma/checks/concurrency.sh` fires twenty simultaneous votes to prove the
+   second, and removing the row lock from the last-administrator check in the same file is
+   a documented negative control that leaves zero administrators.
+2. **`backend/test/authorization-matrix.ts`** — all 39 endpoints with an explicit access
+   level, audited against the controllers by `npx tsx test/route-audit.ts`, which needs
+   nothing installed. Try deleting a row and running it.
+3. **`backend/src/modules/settings/settings-resolution.ts`** — global defaults resolved
+   against user overrides, as a pure function. `NULL` means *inherit*, which is what makes
+   changing a global default reach everyone who never customised it.
+4. **`backend/src/modules/feedback/feedback.repository.ts`** — the list query, with
+   `prisma/checks/list-query.sql` verifying it against real data across the filter, sort,
+   search and pagination matrix.
+5. **`docs/AI_COLLABORATION.md`** — including two bugs caught only by running a real
+   Keycloak, and four separate instances of a check that passed for the wrong reason.
+
+### Things to try
+
+- Sign in as `user@feedbackhub.local`, then as `second@feedbackhub.local`, and try to edit
+  the other one's request. The button is not there, and the endpoint refuses.
+- Sign in as `admin@feedbackhub.local` and try to edit — not delete — someone else's
+  comment. Also refused: moderation is not impersonation.
+- `PATCH /api/v1/admin/feature-flags/comments.enabled` with `{"enabled": false}`, then
+  reload a request. The discussion disappears *and* `POST …/comments` returns 403.
+- `PATCH /api/v1/me` with `{"role": "ADMIN"}` returns 400 — the field is rejected, not
+  ignored.
+
 ## What works / what doesn't
 
-Tracked honestly in [`docs/SCOPE.md`](docs/SCOPE.md) as the project progresses.
+**Works, and has been verified against real infrastructure:**
+
+- The complete database schema, its constraints and its triggers — 79 assertions across
+  five check files, run against PostgreSQL 16, including concurrency.
+- The Keycloak realm: imported into a real Keycloak 26.5, with a token fetched and decoded
+  to confirm it carries the audience and identity claims the API verifies.
+- The list query, verified across filters, sorts, search, pagination and per-viewer state.
+- Settings resolution, slug derivation and the URL/filter conversion — pure functions,
+  executed directly.
+- The authorization matrix, audited against the controllers.
+
+**Built but not verified:**
+
+- **No TypeScript in this repository has ever been compiled.** The build environment could
+  not reach the npm registry, so no dependency could be installed and no test runner could
+  run. Sources were type-checked with a standalone `tsc` and every diagnostic traced to a
+  missing module. This is the honest state of the project and the first thing to check.
+
+**Not built:**
+
+- Deployment artefacts — Dockerfiles and Kubernetes manifests. `docker-compose.yml` exists
+  and brings up PostgreSQL and Keycloak.
+- The settings and administration screens. Their API endpoints are complete.
+- Registration policy and submission rate limits are stored and editable, but not yet
+  enforced.
+
+The full list, with reasoning, is in [`docs/SCOPE.md`](docs/SCOPE.md).
 
 ---
 

@@ -546,3 +546,23 @@ This project has now accumulated four instances of a check that passed for the w
 deliberately is the only one of the responses that has actually worked. Asserting that a
 check is correct, documenting that checks can be wrong, and being more careful have each
 been tried and have each been followed by another instance.
+
+### #31 — Documentation drifts the same way code does
+
+Assembling the final README surfaced three stale passages that had accumulated from
+incremental edits across the phases: a repository layout still annotating directories with
+"added in Phase 8", a "not yet runnable — the API lands next" line written before the API
+existed, and a paragraph about the unit tests that appeared twice because a later edit
+inserted a fuller version above the original without removing it.
+
+None of these were introduced carelessly. Each was correct when written and became false
+when the next phase landed. That is the same failure as a stale comment above a changed
+function, and it deserves the same treatment: a scan for phrases that assert a state
+(`lands next`, `added in Phase`, `not yet`, `TBD`) rather than trusting that the document
+was updated alongside the thing it describes.
+
+Worth noting alongside entries #12, #26 and #27 as a variant of the same theme running
+through this project: **the claim and the reality have to be checked against each other by
+something mechanical, because they will diverge silently otherwise.** In the shell case the
+fix was ending file writes with `find`. Here it is grepping for state-asserting phrases
+before committing documentation.

@@ -91,9 +91,22 @@ requirement turns out to need it.
 
 ## What another week would buy
 
-To be written as the picture becomes concrete. Current candidates: duplicate-request
-detection on the create form, real email delivery for notification preferences, an
-invitation flow for invite-only registration, and an admin audit log.
+In the order the time would be spent:
+
+1. **Compile and run everything.** The single largest gap. Everything else on this list is
+   speculative until the TypeScript has been built once.
+2. **Dockerfiles and Kubernetes manifests**, applied on kind and confirmed reaching Ready —
+   untested manifests are transparently untested to anyone who reads them carefully.
+3. **The settings and administration screens.** The endpoints are complete, so this is
+   user interface work against a finished API.
+4. **Enforce what is currently only stored**: the registration policy at provisioning time
+   and the submission rate limit on request creation.
+5. **Duplicate-request detection on the create form** — search-as-you-type against existing
+   titles. Not requested, but it addresses the product's stated purpose more directly than
+   anything else that could be built: the brief says the point is "to stop the same
+   suggestion arriving five times".
+6. **An end-to-end test** of the golden journey, and email delivery for the notification
+   preference that is currently honoured only as far as an outbox.
 
 ---
 
