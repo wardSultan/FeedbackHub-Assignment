@@ -128,8 +128,17 @@ coverage: environment validation, the ownership rules, slug derivation, settings
 resolution, and the URL/filter conversion that the board's state depends on.
 
 ```bash
-cd backend  && npm test
+cd backend  && npm test          # unit tests
+cd backend  && npm run test:e2e  # authorization matrix against a real database
 cd frontend && npm test
+```
+
+The authorization rules for all 39 endpoints live in one table
+(`backend/test/authorization-matrix.ts`). It is audited against the controllers by a check
+that needs nothing installed — it reads the source — and fails if any endpoint has no rule:
+
+```bash
+cd backend && npx tsx test/route-audit.ts
 ```
 
 ## What works / what doesn't

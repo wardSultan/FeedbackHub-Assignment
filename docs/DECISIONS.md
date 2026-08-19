@@ -593,3 +593,35 @@ resolving them first removes a circular dependency instead of working around one
 same-origin file. If it fails, the failure is written directly into the document: at that
 point there is no Angular error handler and no rendered page, and a blank screen with a
 console error is the worst possible first-run experience.
+
+---
+
+## ADR-0021 — The authorization rules are a table, audited against the code
+
+**Context.** The brief puts authorization first among correctness concerns: "authorization
+enforced on the server rather than hidden in the UI". Thirty-nine endpoints, five kinds of
+caller.
+
+**Decision.** The rules live in one table, `test/authorization-matrix.ts`, with two
+consumers: a static audit that checks the table against the controllers, and a runtime
+suite that generates one request per endpoint and caller from the same table.
+
+**Why.** Hand-written authorization tests guard against the wrong failure. The dangerous
+case is not a rule tested wrongly — it is an endpoint added with no rule at all, which a
+hand-written suite records as silence. A table makes that state impossible to reach
+quietly: `npm run audit:routes` fails if a route has no rule, if a rule has no route, or if
+the decorators disagree with what the rule claims.
+
+The audit needs nothing installed — it reads the source — so it runs in environments where
+the test suite cannot.
+
+**The runtime suite stubs token verification rather than driving Keycloak.** That is only
+possible because the role lives in our own table rather than in a token claim (ADR-0012),
+and it is the payoff of that decision: the whole matrix runs against a constructed subject,
+fast enough to be worth running on every commit. The database is *not* stubbed — the
+ownership rules are queries, and mocking them would be testing the mock.
+
+**Consequences.** Adding an endpoint means adding a row, which is the intended friction.
+The audit was itself verified by breaking it three ways — a removed rule, a rule claiming
+an admin guard the code does not have, and a feature gate the code does not apply — and
+confirming each is caught. An audit that has never failed is an assumption.
