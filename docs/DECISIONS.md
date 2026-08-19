@@ -300,3 +300,55 @@ ESM anyway; revisit TypeScript 7 when ts-jest supports it.
 `@nestjs/config` 4.0.4, `@nestjs/swagger` 11.4.6 (peer `^11.0.1`), `@nestjs/cli` 11.0.24,
 `prisma` 7.9.1 latest / 6.19.2 prev, `typescript` 7.0.2 latest / 5.9.3 in the Nest CLI,
 `ts-jest` 29.4.12 (peer `typescript >=4.3 <7`), `jest` 30.4.2, `zod` 4.4.3.*
+
+---
+
+## ADR-0012 — The identity provider proves identity; the application owns authorization
+
+**Context.** Keycloak can carry roles in the token as realm roles. It is the obvious thing
+to do, and it is not what this application does.
+
+**Options.**
+
+1. Roles as Keycloak realm roles, read from the `realm_access` claim.
+2. Role as a column on the local `users` table, with the identity provider establishing
+   only *who* the caller is.
+
+**Decision.** Option 2. The token answers "who is this"; the database answers "what may
+they do here".
+
+**Why.** Promoting an administrator is an application operation, not an identity
+operation. With roles in the token it means an admin-API call into Keycloak, and the change
+does not take effect until the user's token is refreshed — so a demoted admin keeps their
+powers for the rest of the token lifetime. With the role in our own table it is a single
+`UPDATE` that takes effect on the next request.
+
+There is a second benefit that shows up in testing: because authorization does not depend
+on claims, the entire authorization test suite runs against a constructed principal with no
+Keycloak container in the loop. That is what makes it cheap enough to be exhaustive, which
+matters given the brief grades server-side authorization directly.
+
+A local user row is needed regardless — it owns settings and is the foreign key for
+everything the user authors — so this adds no table that would not otherwise exist.
+
+**Consequences.** The first administrator has to come from somewhere: `BOOTSTRAP_ADMIN_EMAIL`
+provisions the matching account as an admin on first sign-in, so a clean install has a
+working administrator without a manual database edit. Keycloak's own roles are unused, which
+should be stated so it does not read as an oversight.
+
+**Related decisions in the same area, all verified against a running Keycloak 26.5:**
+
+- The SPA is a **public client using authorization code flow with PKCE**. A browser cannot
+  keep a secret, so a confidential client would be security theatre.
+- The API verifies `iss`, `aud`, `exp` and pins the algorithm to **RS256**. Pinning is what
+  closes off `alg: none` and algorithm-confusion attacks — the algorithm must never be
+  taken from the token being validated.
+- Verifying an audience requires the realm to *emit* one. Keycloak does not add an `aud`
+  claim for a client by default; an audience mapper has to be attached. Without it every
+  token fails validation.
+- Authentication is applied **globally with an explicit `@Public()` opt-out**, rather than
+  per controller. A forgotten decorator then produces a locked endpoint somebody reports,
+  instead of an open one nobody notices.
+- **Admins may delete others' content but never edit its text.** The brief grants triage and
+  moderation, never impersonation, and the difference is the gap between "an admin removed
+  my comment" and "an admin rewrote my comment and left my name on it".

@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 1 — backend foundation.** Authentication, the domain modules
-> and the frontend are still to come.
+> **Current status: Phase 2 — authentication and authorization.** The domain modules and
+> the frontend are still to come.
 
 ---
 
@@ -13,6 +13,15 @@ ambiguity in the brief was interpreted.
 - **Database schema** — nine tables with the vote-uniqueness and derived-count invariants
   enforced by the database rather than by application code, verified by 32 invariant
   checks and a concurrency check that run against a real PostgreSQL instance.
+- **Identity** — a Keycloak realm committed as configuration: the SPA as a public client
+  with PKCE, an audience mapper so tokens carry a verifiable `aud`, brute-force protection,
+  and three seeded demo accounts. Verified by importing it into a real Keycloak 26.5 and
+  decoding an issued token.
+- **Authentication and authorization** — token verification against the realm's JWKS with a
+  pinned algorithm, just-in-time user provisioning, globally applied guards with an explicit
+  public opt-out, and ownership rules as pure functions with unit tests.
+- **Local stack** — Docker Compose for PostgreSQL and Keycloak, with a healthcheck verified
+  against a running instance rather than assumed.
 - **API foundation** — NestJS application skeleton: environment validation that refuses to
   start on bad configuration, a Prisma module, RFC 9457 problem-details error handling,
   field-level validation errors, mass-assignment protection, security headers, an explicit

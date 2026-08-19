@@ -5,11 +5,13 @@ import {
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../modules/auth/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('health')
 // Version-neutral and outside the global prefix: probe URLs are infrastructure
 // contracts and must not move when the API is versioned.
+@Public()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}

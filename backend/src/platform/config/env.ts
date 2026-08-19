@@ -21,6 +21,24 @@ export const envSchema = z.object({
     .string()
     .default('http://localhost:4200')
     .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
+
+  /**
+   * The realm's issuer URL, exactly as it appears in the `iss` claim. Tokens whose issuer
+   * differs are rejected, so a mismatch here is a hard failure rather than a warning.
+   */
+  KEYCLOAK_ISSUER_URL: z.string().regex(/^https?:\/\//, 'must be an absolute URL'),
+
+  /** Expected `aud` claim. Without this check the API accepts any token the realm issued. */
+  KEYCLOAK_AUDIENCE: z.string().min(1).default('feedbackhub-api'),
+
+  /**
+   * The first user with this email is provisioned as an admin, so a clean install has a
+   * working administrator without a manual database edit.
+   */
+  BOOTSTRAP_ADMIN_EMAIL: z
+    .string()
+    .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address')
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -199,3 +199,50 @@ Worth recording as a category rather than an incident: shell scripting that mixe
 with a sequence of independent commands produces exactly this — partial execution
 reported as success. Subsequent file batches use absolute paths and are verified by
 listing the result.
+
+### #13 — Keycloak was downloadable after all, and it found two real bugs
+
+The container registries are still blocked, but Keycloak publishes its distribution as a
+GitHub release, and GitHub is reachable. Java 21 is installed. So Keycloak 26.5.0 was
+downloaded and run natively, and the realm configuration was verified against it instead of
+being written blind and hoped over.
+
+It found two bugs that would both have shipped, and neither would have been obvious from
+reading the file.
+
+**The realm import silently wiped every built-in client scope.** The realm JSON declared a
+top-level `clientScopes` array in order to add one custom scope carrying an audience mapper.
+That array does not *add* scopes — it *replaces* the realm's entire set, so `profile`,
+`email`, `roles`, `web-origins`, `acr` and `basic` ceased to exist. The client's
+`defaultClientScopes` then referenced six names that were gone, and Keycloak dropped them
+without a warning. The import logged `Realm 'feedbackhub' imported` and looked completely
+fine.
+
+The symptom, found by fetching a real token and decoding it: no `aud` claim, no `email`, no
+`preferred_username`. The API's audience check would have rejected every token in existence
+and the whole application would have been unusable, with the cause several layers away from
+the error. Fixed by dropping the custom scope entirely and attaching the audience mapper
+directly to the client — fewer moving parts, and no way to clobber the defaults.
+
+**The Keycloak healthcheck used LF where HTTP requires CRLF.** The Keycloak image ships no
+curl, so the standard healthcheck talks HTTP over bash's `/dev/tcp`. The widely copied form
+of it uses `echo -e "GET ... HTTP/1.1\nHost: ...\n\n"`. Against a real Keycloak that returns
+**400 Bad Request**, so the container never becomes healthy and
+`depends_on: condition: service_healthy` hangs `docker compose up` forever. `printf` with
+`\r\n` returns 200. Verified by extracting the healthcheck exactly as `docker compose config`
+resolves it and running that string against the live instance.
+
+Both are the same category, and it is the category worth naming: **configuration that is
+syntactically valid, reads correctly, and is wrong at runtime.** Neither a linter, a type
+checker nor a review would have caught either. Only running it did.
+
+### #14 — A stale cross-reference caught by grepping rather than by reading
+
+A comment in `principal.ts` cited "ADR-0005" for the decision that the identity provider
+proves identity while the application owns authorization. ADR-0005 is the Angular state
+management decision; the auth ADR had not been written yet, and the number was invented.
+
+Found by grepping every `ADR-` reference in the source against the headings in
+`DECISIONS.md`, which takes one command and is worth repeating before each commit. A
+confident, specific, wrong citation is worse than no citation: it sends a reader to the
+wrong page and quietly undermines trust in every other reference in the codebase.

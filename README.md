@@ -41,8 +41,7 @@ placeholders.
 ## Requirements
 
 - Node.js 22 LTS (see [`.nvmrc`](.nvmrc))
-- PostgreSQL 16
-- Docker + Docker Compose
+- Docker + Docker Compose (provides PostgreSQL 16 and Keycloak 26)
 
 ## Running it
 
@@ -61,14 +60,31 @@ The migration creates the schema and the reference data the application cannot s
 without: the app settings row, the default statuses and categories, and the feature
 flags. Demo content is separate and arrives with the seed script.
 
-The API foundation is in place but has not yet been compiled — see
-[`docs/SCOPE.md`](docs/SCOPE.md) for why. To build and run it:
+Start the backing services first — PostgreSQL and Keycloak, with the realm imported:
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+Keycloak takes 30–60 seconds on a cold start; the API waits for its healthcheck. The
+realm arrives pre-configured with the SPA client and three demo accounts:
+
+| Account | Password | Notes |
+|---|---|---|
+| `admin@feedbackhub.local` | `Passw0rd!demo` | Provisioned as an administrator on first sign-in |
+| `user@feedbackhub.local` | `Passw0rd!demo` | Ordinary user |
+| `second@feedbackhub.local` | `Passw0rd!demo` | A second user, for checking that one user cannot edit another's content |
+
+Then the API — which has not yet been compiled here, see
+[`docs/SCOPE.md`](docs/SCOPE.md) for why:
 
 ```bash
 cd backend
 cp .env.example .env      # adjust DATABASE_URL if needed
 npm install
 npm run prisma:generate
+npm run prisma:migrate
 npm run start:dev
 ```
 
