@@ -41,16 +41,40 @@ placeholders.
 ## Requirements
 
 - Node.js 22 LTS (see [`.nvmrc`](.nvmrc))
+- PostgreSQL 16
 - Docker + Docker Compose
 
 ## Running it
 
-Not yet runnable — the backend lands in Phase 1. This section will carry the verified
+Not yet runnable end to end — the API lands next. This section will carry the verified
 one-command quick start, and will be checked from a clean clone before it is written.
+
+The database schema, however, is complete and independently runnable:
+
+```bash
+createdb feedbackhub
+psql -d feedbackhub -v ON_ERROR_STOP=1 \
+  -f backend/prisma/migrations/20260819120000_init/migration.sql
+```
+
+The migration creates the schema and the reference data the application cannot start
+without: the app settings row, the default statuses and categories, and the feature
+flags. Demo content is separate and arrives with the seed script.
 
 ## Running the tests
 
-Not yet applicable.
+The schema's guarantees are verified directly against PostgreSQL, below the application
+layer where no application bug can reach:
+
+```bash
+# 32 invariant checks — constraints, triggers, cascades, search. Rolls back cleanly.
+psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/schema-invariants.sql
+
+# Vote uniqueness and counter correctness under genuine concurrency.
+./backend/prisma/checks/concurrency.sh
+```
+
+Application-level tests arrive with the API.
 
 ## What works / what doesn't
 

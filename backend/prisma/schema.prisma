@@ -1,0 +1,267 @@
+// FeedbackHub data model.
+//
+// The migration SQL is the source of truth for everything Prisma's schema language
+// cannot express: partial unique indexes, CHECK constraints, the generated tsvector
+// column, and the triggers that maintain the derived counts. Those objects are listed
+// against the models below so they are not a surprise to anyone reading only this file.
+//
+// Consequence for the workflow: schema changes are authored with
+// `prisma migrate dev --create-only`, then the generated SQL is edited by hand before
+// being applied. Running plain `prisma migrate dev` would drop the hand-written objects.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum ListSort {
+  NEWEST
+  OLDEST
+  MOST_VOTED
+  MOST_COMMENTED
+  RECENTLY_UPDATED
+}
+
+enum RegistrationPolicy {
+  OPEN
+  INVITE_ONLY
+  DOMAIN_RESTRICTED
+}
+
+enum CommentModerationStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+/// A person, as this application knows them. Keycloak owns credentials and proves who
+/// someone is; this row owns what they may do here and everything they have authored.
+model User {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// The OIDC `sub` claim — immutable, and the only link back to the identity provider.
+  idpSubject  String    @unique @map("idp_subject")
+  email       String
+  displayName String    @map("display_name")
+  avatarUrl   String?   @map("avatar_url")
+  /// Authorization is owned by the application, not read from a token claim.
+  role        UserRole  @default(USER)
+  isActive    Boolean   @default(true) @map("is_active")
+  /// Account deletion anonymises this row rather than removing it, so authored content
+  /// keeps a valid foreign key and renders as "Deleted user".
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  settings         UserSettings?
+  requests         FeedbackRequest[]
+  votes            Vote[]
+  comments         Comment[]
+  settingsUpdated  AppSettings[]  @relation("AppSettingsUpdatedBy")
+  flagsUpdated     FeatureFlag[]  @relation("FeatureFlagUpdatedBy")
+
+  // SQL-only: UNIQUE INDEX on lower(email); partial index on role = 'ADMIN'.
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy — admin-curated, retired rather than deleted
+// ---------------------------------------------------------------------------
+
+model Category {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String   @unique
+  name      String
+  color     String   @default("#6b7280")
+  sortOrder Int      @default(0) @map("sort_order")
+  /// Retiring a category hides it from the create form; existing requests keep it.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requests FeedbackRequest[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model Status {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String   @unique
+  name      String
+  color     String   @default("#6b7280")
+  sortOrder Int      @default(0) @map("sort_order")
+  /// New requests take the default status. Exactly one row may have this set.
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requests FeedbackRequest[]
+
+  // SQL-only: UNIQUE INDEX (is_default) WHERE is_default — the single-default rule.
+  @@index([isActive, sortOrder])
+  @@map("statuses")
+}
+
+// ---------------------------------------------------------------------------
+// Feedback
+// ---------------------------------------------------------------------------
+
+model FeedbackRequest {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String
+  categoryId  String    @map("category_id") @db.Uuid
+  statusId    String    @map("status_id") @db.Uuid
+  authorId    String    @map("author_id") @db.Uuid
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  pinnedAt    DateTime? @map("pinned_at") @db.Timestamptz(6)
+  /// Maintained by database triggers on `votes` and `comments`, never written by the
+  /// application. See the migration for the trigger definitions.
+  voteCount    Int      @default(0) @map("vote_count")
+  commentCount Int      @default(0) @map("comment_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  /// Generated column: weighted title + description. Prisma cannot express generated
+  /// columns, so it is declared unsupported and excluded from the client.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  status   Status    @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  votes    Vote[]
+  comments Comment[]
+
+  // SQL-only: GIN index on search_vector; CHECK constraints on title/description length,
+  // non-negative counts, and pinned/pinned_at consistency.
+  @@index([isPinned(sort: Desc), pinnedAt(sort: Desc), createdAt(sort: Desc)], map: "feedback_requests_default_sort_idx")
+  @@index([isPinned(sort: Desc), voteCount(sort: Desc), createdAt(sort: Desc)], map: "feedback_requests_votes_sort_idx")
+  @@index([statusId])
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("feedback_requests")
+}
+
+/// A user's upvote. The composite primary key *is* the "at most once" rule — an
+/// application-level check would lose to two concurrent requests from one double-click.
+model Vote {
+  requestId String   @map("request_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  request FeedbackRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, userId])
+  @@index([userId])
+  @@map("votes")
+}
+
+model Comment {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId        String                  @map("request_id") @db.Uuid
+  authorId         String                  @map("author_id") @db.Uuid
+  body             String
+  moderationStatus CommentModerationStatus @default(APPROVED) @map("moderation_status")
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Set only when the body changes, so an admin approving a comment does not make it
+  /// look edited.
+  editedAt         DateTime?               @map("edited_at") @db.Timestamptz(6)
+  deletedAt        DateTime?               @map("deleted_at") @db.Timestamptz(6)
+
+  request FeedbackRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author  User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  // SQL-only: partial index on pending comments for the moderation queue.
+  @@index([requestId, createdAt])
+  @@map("comments")
+}
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+/// Single-row table holding global configuration and the defaults that user settings
+/// override. The boolean primary key makes a second row impossible.
+model AppSettings {
+  id                         Boolean            @id @default(true)
+  registrationPolicy         RegistrationPolicy @default(OPEN) @map("registration_policy")
+  allowedEmailDomains        String[]           @default([]) @map("allowed_email_domains")
+  commentsRequireApproval    Boolean            @default(false) @map("comments_require_approval")
+  submissionLimitCount       Int                @default(5) @map("submission_limit_count")
+  submissionLimitWindowHours Int                @default(24) @map("submission_limit_window_hours")
+  defaultTheme               Theme              @default(SYSTEM) @map("default_theme")
+  defaultLanguage            String             @default("en") @map("default_language")
+  defaultSort                ListSort           @default(NEWEST) @map("default_sort")
+  /// { "statuses": [...], "categories": [...] } — see UserSettings.defaultFilters.
+  defaultFilters             Json               @default("{}") @map("default_filters")
+  updatedById                String?            @map("updated_by") @db.Uuid
+  updatedAt                  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("AppSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  // SQL-only: CHECK constraints for the single row, positive limits, and a domain
+  // restriction never being saved with an empty domain list.
+  @@map("app_settings")
+}
+
+/// Per-user overrides. Every column is nullable and NULL means "inherit the global
+/// default" — not "off". That is what makes a change to a global default propagate to
+/// users who never customised the setting.
+model UserSettings {
+  userId               String    @id @map("user_id") @db.Uuid
+  theme                Theme?
+  language             String?
+  defaultSort          ListSort? @map("default_sort")
+  /// NULL means inherit; `{}` means an override that selects no filters. Prisma cannot
+  /// model a nullable list, so the two filter dimensions share one nullable blob rather
+  /// than losing that distinction.
+  defaultFilters       Json?     @map("default_filters")
+  notifyOnComment      Boolean?  @map("notify_on_comment")
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+/// Flags are code-coupled: they are seeded by migration and toggled by admins, not
+/// invented at runtime. Keeping them as rows rather than a JSON blob makes them
+/// enumerable, so the admin UI can list them with descriptions.
+model FeatureFlag {
+  key         String   @id
+  name        String
+  description String
+  enabled     Boolean  @default(false)
+  updatedById String?  @map("updated_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("FeatureFlagUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("feature_flags")
+}

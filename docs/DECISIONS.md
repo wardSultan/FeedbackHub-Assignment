@@ -173,3 +173,92 @@ separate log file would drift out of sync with the history it describes.
 
 **Consequences.** Every commit needs the trailer, including hand-written ones — an
 unmarked commit would be ambiguous rather than implicitly `none`.
+
+---
+
+## ADR-0008 — PostgreSQL 16, and `gen_random_uuid()` for primary keys
+
+**Context.** The planning document suggested PostgreSQL 17/18 and UUIDv7 primary keys.
+UUIDv7 is time-sortable, which gives better index locality than random v4 keys.
+
+**Decision.** PostgreSQL 16 everywhere — local, container and manifests — with
+`gen_random_uuid()` (v4) as the primary-key default.
+
+**Why.** `uuidv7()` is not a built-in until PostgreSQL 18. Getting it on 16 means either an
+extension or generating keys in the application, which splits key generation across two
+places and breaks raw-SQL seeding. The benefit it buys — index locality on inserts — is
+invisible at the scale of an internal feedback board. Pinning to 16 also means the version
+the schema is developed and tested against is the version that ships.
+
+**Consequences.** Primary keys are random rather than time-ordered, so B-tree inserts are
+slightly less local. Irrelevant here; revisit only if the row counts ever change by orders
+of magnitude. PostgreSQL 16 is supported until November 2028.
+
+---
+
+## ADR-0009 — Derived counts maintained by triggers, using delta arithmetic
+
+**Context.** The brief calls out that "vote count" and "comment count" are derived and must
+stay correct. There are three ways to do that.
+
+**Options.**
+
+1. Compute on read with a `COUNT(*)` subquery — impossible to drift, but sorting by
+   popularity across a filtered, paginated set gets expensive, and that is a first-class
+   sort in this product.
+2. Counter columns maintained by the application in each write path — fast, but every
+   future writer has to remember, and seeds, cascade deletes and admin scripts will not.
+3. Counter columns maintained by database triggers.
+
+**Decision.** Option 3, with the trigger applying a delta (`vote_count = vote_count + 1`)
+rather than recomputing a `COUNT(*)` into the column.
+
+**Why.** An invariant should be enforced at the lowest layer that can enforce it, because
+every layer above is a layer someone can forget to go through. Triggers survive cascade
+deletes, raw SQL and any future caller.
+
+The delta detail matters and is not cosmetic: a recomputing trigger evaluates its subquery
+against a snapshot, so two concurrent votes can both read the same starting count and one
+update is lost. `vote_count + 1` is evaluated while the row is locked by the `UPDATE`, so
+concurrent votes serialise correctly. This is verified by
+`backend/prisma/checks/concurrency.sh`, which fires twenty simultaneous votes and asserts
+the counter reaches twenty.
+
+The comment trigger is expressed as the difference between the old and new *visibility* of
+a comment — approved and not deleted — rather than as a set of special cases per operation.
+Every transition (create, approve, reject, soft-delete, restore, edit) then falls out of one
+rule instead of six, which is both shorter and harder to get wrong.
+
+**Consequences.** Count-maintenance logic lives in SQL rather than TypeScript, so it has to
+be documented where a reader will find it — it is commented in the migration and noted
+against the model in `schema.prisma`. `CHECK (count >= 0)` constraints act as tripwires: if
+the logic is ever wrong the transaction fails loudly instead of showing a negative count.
+
+---
+
+## ADR-0010 — Default list filters stored as a nullable JSON column
+
+**Context.** Users may override their default list sort *and filters*. Filters span two
+dimensions (statuses and categories). The resolution rule is that a `NULL` override means
+"inherit the global default", which has to stay distinguishable from an override that
+deliberately selects nothing.
+
+**Options.** Two nullable `text[]` columns; two non-nullable arrays plus a separate
+"has override" boolean; one nullable `jsonb` column.
+
+**Decision.** One nullable `jsonb` column, `default_filters`, holding
+`{ "statuses": [...], "categories": [...] }`.
+
+**Why.** The first option is the most typed and was the original plan, but Prisma cannot
+model a nullable list — lists are non-nullable by definition — so it would have forced the
+settings code onto raw SQL, or forced away the null/empty distinction that the whole
+inheritance rule depends on. The third option keeps the distinction, keeps the code on the
+generated client, and collapses two columns into one.
+
+This was caught by reading the schema back against Prisma's type system before committing,
+not by a failing build — there is no Prisma binary available in the build environment yet.
+
+**Consequences.** The filter contents are not typed by the database and are validated by the
+API layer instead. Acceptable: this is a UI preference blob, not a place where integrity
+matters. The important invariant — `NULL` means inherit — is preserved and is the thing the
+resolution logic depends on.
