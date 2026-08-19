@@ -1,0 +1,23 @@
+{
+  "name": "feedbackhub-assignment",
+  "version": "1.0.0",
+  "description": "An internal product feedback board. Employees submit feature requests and product feedback, browse what already exists, upvote the requests they care about, and discuss them in comments. A product-team member (admin) triages incoming requests: setting status, curating categories, and moderating content.",
+  "homepage": "https://github.com/wardSultan/FeedbackHub-Assignment#readme",
+  "bugs": {
+    "url": "https://github.com/wardSultan/FeedbackHub-Assignment/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://wardSultan@github.com/wardSultan/FeedbackHub-Assignment.git"
+  },
+  "license": "ISC",
+  "author": "ward",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
