@@ -3,7 +3,7 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 4 — voting.** Comments, admin configuration, settings and the
+> **Current status: Phase 5 — comments.** Admin configuration, user settings and the
 > frontend are still to come.
 
 ---
@@ -31,6 +31,11 @@ ambiguity in the brief was interpreted.
   trigger-maintained column so an optimistic client can reconcile. Neither endpoint takes
   a user identifier: the voter comes from the token and the composite primary key is the
   "at most once" rule.
+- **Comments** — create, edit own, delete own or moderate as an administrator, with the
+  approval workflow and a visibility rule verified against the database: a pending comment
+  is visible to its author and to administrators and to nobody else.
+- **Feature flags** — read from the database and enforced by a route guard, so disabling a
+  feature refuses the request rather than only hiding the control.
 - **Demo data** — an idempotent seed attributing content to the same accounts the Keycloak
   realm creates, so signing in lands on an account that already owns requests.
 - **API foundation** — NestJS application skeleton: environment validation that refuses to
@@ -218,6 +223,24 @@ Comments are not searched — the de-duplication use case is finding an existing
 
 **Interpretation.** No limit; pinned items ordered most-recently-pinned first. The admin UI
 shows how many are currently pinned so admins can self-regulate.
+
+### A-22 — Does "comments require approval" apply to administrators?
+
+The setting says comments require approval; it does not say whose.
+
+**Interpretation.** Administrators' own comments are approved on creation. They are the
+moderators, so queueing their comments for their own approval would be theatre, and it
+would make an admin's reply to a moderation question invisible until they approved it
+themselves.
+
+### A-23 — Does editing an approved comment send it back for approval?
+
+Not addressed by the brief, and the answer matters more than it first appears.
+
+**Interpretation.** Yes, when approval is required. Otherwise moderation is trivially
+bypassed: post something innocuous, wait for it to be approved, then edit it into whatever
+you actually wanted to say. The cost is that a typo fix re-enters the queue, which is the
+right trade for a setting whose entire purpose is that nothing appears unreviewed.
 
 ---
 

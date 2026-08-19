@@ -386,3 +386,29 @@ suite, which fails immediately if a column disappears. Every value including the
 is a bound parameter, so nothing from the request reaches the statement as SQL. The check
 file and the repository hold the same query in two places and have to be changed together;
 both say so.
+
+---
+
+## ADR-0014 — Feature flags are enforced by a route guard, not by the user interface
+
+**Context.** The brief asks for "at least one feature flag that visibly changes application
+behaviour when toggled". The obvious implementation hides a section of the interface.
+
+**Decision.** Flags are read from the database on each request and applied by a global
+guard driven by a `@RequiresFeature('...')` decorator. Disabling `comments.enabled` hides
+the comment section *and* makes every comment endpoint return 403.
+
+**Why.** A flag enforced only in the browser is a user-interface preference. The routes are
+still live, and anyone with the network tab open can call them. Hiding the control is for
+the person using the application; the guard is for everyone else. Given that the brief
+grades server-side enforcement of authorization explicitly, shipping a browser-only flag
+would signal the opposite of the intended lesson.
+
+Unknown flag keys evaluate to *disabled*. A flag deleted from the database, or misspelled
+at a call site, must not silently open a feature.
+
+**Consequences.** Each flagged route costs a single-row primary-key lookup. That is
+deliberately uncached: a runtime toggle whose whole purpose is to take effect immediately
+should not have a window in which an administrator has flipped it and the application has
+not noticed. If a hot path ever justifies a cache, that is the point to measure and add
+one — not before.

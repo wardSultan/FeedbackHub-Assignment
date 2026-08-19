@@ -317,3 +317,38 @@ honest response to both is the same final state and the same status code.
 The checks were extended with the exact statements the endpoints emit — `ON CONFLICT DO
 NOTHING` for a cast, an unqualified `DELETE` for a withdrawal — repeated three times each,
 asserting the count settles at one and then at zero without going negative.
+
+### #19 — Two rules the brief does not state, both of which matter
+
+Comments needed two decisions the brief is silent on, and both are the kind that are easy
+to get wrong by not noticing there is a decision to make.
+
+The first: when "comments require approval" is on, does an administrator's own comment go
+into the queue? Queueing a moderator's comment for their own approval is theatre, and it
+would make an admin's reply to a moderation question invisible until they approved it
+themselves. Administrators are approved on creation (SCOPE A-22).
+
+The second is the one worth dwelling on. Does editing an *approved* comment send it back
+for approval? The comfortable answer is no — re-queueing a typo fix is annoying. But the
+comfortable answer makes moderation ornamental: post something innocuous, wait for
+approval, then edit it into whatever you actually wanted to say. The whole feature exists
+so that nothing appears unreviewed, and an edit is new text. It re-enters the queue
+(SCOPE A-23).
+
+Neither was surfaced by a requirement or a test. Both came from asking what an unfriendly
+user would do with the feature as designed, which is a question worth asking of every
+moderation control.
+
+### #20 — Checking an authorization rule as data rather than as code
+
+Comment visibility — approved to everyone, pending to its author and to administrators
+only — is expressed as a Prisma `where` clause, which reads plausibly and cannot be run
+here. So the same predicate was written as SQL and checked against real rows across every
+combination of viewer and state: 13 assertions covering author, other user, anonymous and
+administrator against pending, approved, rejected and deleted comments.
+
+Two of those assertions are ones a happy-path test would not have contained. A *rejected*
+comment stays visible to its author, so the rejection is not silent — a comment that simply
+vanishes reads as a bug and gets re-posted. And a *deleted* comment is hidden even from an
+administrator, because moderation removing something should remove it, not archive it into
+a view only some people have.
