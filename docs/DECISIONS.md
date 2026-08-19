@@ -625,3 +625,44 @@ ownership rules are queries, and mocking them would be testing the mock.
 The audit was itself verified by breaking it three ways — a removed rule, a rule claiming
 an admin guard the code does not have, and a feature gate the code does not apply — and
 confirming each is caught. An audit that has never failed is an assumption.
+
+---
+
+## ADR-0022 — Kustomize over Helm, and what the manifests are checked against
+
+**Context.** The brief says the manifests and the configuration approach are being
+assessed, not just whether the application runs.
+
+**Decision.** Raw manifests composed with Kustomize: a `base/` plus a `local/` overlay that
+changes replica counts, image tags and pull policy and nothing else.
+
+**Why Kustomize.** Helm's templating buys reuse across many installations of the same
+chart. This is one application with two environments, so the cost — every manifest becoming
+a template that has to be rendered before it can be read — buys nothing here. Kustomize
+overlays stay reviewable as YAML.
+
+The realm JSON and the database bootstrap script are `configMapGenerator` inputs rather
+than copies, so Compose and Kubernetes mount the same two files. A copy would drift.
+
+**Three details that are decisions rather than boilerplate:**
+
+- **Migrations are a Job, not an init container and not application start-up.** Two API
+  replicas starting together would both run `prisma migrate deploy` against one database.
+- **Liveness checks the process; readiness checks the database.** Pointing liveness at
+  `/health/ready` makes every pod restart during a database blip, turning a recoverable
+  outage into a crash loop.
+- **Keycloak is on its own hostname**, not a path on the application's. A token's `iss` is
+  the URL the browser used; served under a path, the issuer the browser sees and the one
+  the API verifies diverge, and every token fails for a reason several layers from the
+  error.
+
+**What this has *not* been checked against.** No image was built, no cluster was applied.
+The environment could not reach any container registry. What was done instead is
+`infra/k8s/validate.py`: a dependency-free structural check for the cross-file mistakes a
+per-file review does not catch — a Service selector matching no pod, a `secretKeyRef` naming
+a key that does not exist, an Ingress pointing at a port a Service does not expose, an
+unpinned image, a missing probe or resource request, a credential-shaped key in a ConfigMap.
+
+It was verified by breaking the manifests seven ways and confirming each is caught. That is
+a real check of a real class of defect, and it is emphatically not the same as
+`kubectl apply`. `SCOPE.md` says so plainly.

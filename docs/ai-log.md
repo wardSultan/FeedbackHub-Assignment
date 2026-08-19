@@ -566,3 +566,41 @@ through this project: **the claim and the reality have to be checked against eac
 something mechanical, because they will diverge silently otherwise.** In the shell case the
 fix was ending file writes with `find`. Here it is grepping for state-asserting phrases
 before committing documentation.
+
+### #32 — A negative control that did not test what it claimed
+
+The manifest validator was broken seven ways to confirm it catches what it claims. Six
+produced the expected error. The seventh — a Service selector that matches no pod — produced
+nothing.
+
+The validator was fine. The test was wrong: the mutation used `sed` to replace the first
+occurrence of `app.kubernetes.io/name: api` in the file, which is the Service's *metadata
+label*, not its `spec.selector`. Changing a label the check does not read changes nothing.
+Re-run against the pod template's labels instead, the check fires correctly.
+
+This is the same shape as log entries #7, #16, #21 and #30 — a check that appears to prove
+something and does not — except that this time it appeared inside the negative control
+itself. The practice adopted after #30 was "run the failing configuration deliberately", and
+this is its failure mode: *the failing configuration has to actually fail for the reason you
+think*. A negative control that produces no error is only evidence if you have confirmed
+the mutation was real.
+
+Five instances now, across SQL assertions, a shell audit and a Python validator. The
+consistent factor is not the language or the tool. It is that a check and the thing it
+checks are two separate artefacts, and nothing keeps them aligned unless something
+mechanical does.
+
+### #33 — What Phase 10 could and could not be
+
+No container registry was reachable, so no image was built and no cluster was applied.
+Writing Dockerfiles and manifests anyway would have produced plausible YAML with no evidence
+behind it — and the brief says explicitly that the manifests are being assessed.
+
+What was possible: the compose file validates through `docker compose config`, and the
+dependency graph was printed and read rather than assumed — which is how the `migrate`
+service's `service_completed_successfully` condition was confirmed to be what actually gates
+the API. And the manifests get a structural validator that needs nothing installed, aimed at
+the cross-file mistakes that per-file review misses.
+
+The honest boundary, stated in `SCOPE.md` rather than implied: the Dockerfiles have never
+been built and the manifests have never been applied. A structural check is not a cluster.

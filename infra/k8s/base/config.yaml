@@ -1,0 +1,20 @@
+# Non-secret configuration. Anything here is visible to anyone who can read the
+# namespace, which is the test for whether a value belongs in a ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feedbackhub-config
+  namespace: feedbackhub
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  CORS_ORIGINS: "http://feedbackhub.localhost"
+  KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/feedbackhub"
+  KEYCLOAK_AUDIENCE: "feedbackhub-api"
+  BOOTSTRAP_ADMIN_EMAIL: "admin@feedbackhub.local"
+  # Read by the web container's entrypoint. The issuer is the *browser-facing* URL,
+  # which is not the in-cluster one the API uses — the browser cannot resolve
+  # "keycloak", and a token's issuer must match what the browser was redirected to.
+  API_URL: "http://feedbackhub.localhost/api"
+  KEYCLOAK_ISSUER: "http://auth.feedbackhub.localhost/realms/feedbackhub"
+  KEYCLOAK_CLIENT_ID: "feedbackhub-web"
