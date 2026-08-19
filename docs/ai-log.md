@@ -83,3 +83,59 @@ numbers and were verified by re-reading the file, not by trusting the tool's exi
 This is a small instance of a general failure mode worth watching for in the rest of the
 project: a change that silences the symptom the tool reported while introducing a different
 problem the tool does not check for.
+
+### #6 — Schema built against a real database rather than written blind
+
+npm is still unreachable, but PostgreSQL 16 is installed locally, so the database half of
+Phase 1 could be done properly: the migration was applied to a real database and the
+schema's guarantees asserted rather than assumed.
+
+Written and run: 32 invariant checks (`backend/prisma/checks/schema-invariants.sql`)
+covering vote uniqueness, both count triggers across every visibility transition, the
+single-default-status rule, taxonomy retire-versus-delete, field constraints, full-text
+search including hostile input, and cascade behaviour. Plus a separate concurrency check
+firing twenty simultaneous votes from real parallel connections.
+
+The concurrency check earned its place immediately. The obvious way to write a count
+trigger is to recompute `COUNT(*)` into the column, which is simpler to read and *wrong*
+under concurrency — the subquery is evaluated against a snapshot, so two simultaneous votes
+can both compute the same starting value and one update is lost. Delta arithmetic under the
+row lock is correct. A single-session test would have passed either version.
+
+### #7 — A check that failed for the wrong reason
+
+The first full run reported one failure out of 32: "a user who authored content cannot be
+hard-deleted" — the delete succeeded when it should have been refused.
+
+The schema was fine. The check was wrong: it ran *after* the cascade checks, which delete
+the request and take the author's only content with it. By the time the assertion ran there
+was nothing left for the foreign key to protect, so the delete was correctly permitted.
+
+Worth recording because of how it could have gone. The obvious reading of a red test is
+that the schema is missing a constraint, and "fixing" it by adding one would have shipped a
+constraint the schema did not need, justified by a test that never actually tested it. The
+fix was to move the assertion above the cascade block, where the precondition still holds.
+
+### #8 — A Prisma limitation caught by review, not by a compiler
+
+The user settings table originally used two nullable `text[]` columns for the default
+status and category filters, with `NULL` meaning "inherit the global default".
+
+Prisma cannot express a nullable list — lists are non-nullable by definition — so
+`String[]?` is not valid schema syntax. With no Prisma binary available there was no build
+to catch it; it surfaced by reading the schema back against Prisma's type system before
+committing. Replaced with a single nullable `jsonb` column, which preserves the null/empty
+distinction the inheritance rule depends on (ADR-0010).
+
+This is the failure mode to watch while the toolchain is unavailable: code that is correct
+SQL and plausible Prisma, with nothing to disprove it. Everything written in this state is
+explicitly marked as unverified until it has actually been built.
+
+### #9 — Network: partially open after all
+
+`registry.npmjs.org` is still unreachable from the shell (`403 host_not_allowed`), so
+`npm install`, `nest new` and `ng new` remain impossible, as does pulling any container
+image. The web-fetch path *can* reach the registry, which is enough to read package
+metadata and pin accurate versions — but not enough to install anything. So dependency
+versions can be stated from fact rather than recall; the code that uses them still cannot
+be compiled here.
