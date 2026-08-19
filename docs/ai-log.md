@@ -437,3 +437,40 @@ report a *failure* rather than a false pass — the UPDATE did nothing, so no ad
 was demoted, so the count stayed at two and the assertion tripped. Had the same mistake
 been made in the opposite direction it would have sat green and untested indefinitely,
 which is precisely what happened in entries #7 and #16.
+
+### #25 — Writing the rule so it could be run, having learned that lesson twice
+
+Entry #22 ended with "extract the logic that can be run without dependencies, and run it".
+The settings resolution was the first thing built that way rather than discovered that way:
+`settings-resolution.ts` is a pure function over plain data — no Prisma types, no Nest
+decorators, no database — precisely so it could be pasted into `node` and executed before
+anything was wired around it.
+
+Fourteen cases, all passing on the first run, which is less interesting than *which* cases
+they are. Three would have been easy to get wrong and hard to notice:
+
+- Clearing an override must revert to the **current** global, not to whatever the global
+  was when the user first signed in. This is the entire reason NULL means "inherit" rather
+  than the defaults being copied into each user's row at signup — the copy looks identical
+  until an administrator changes a default and nothing happens.
+- `notifyOnComment: false` is an override, not an absence. A `||` in place of `??` here
+  silently re-enables notifications for everyone who turned them off, and no test that only
+  checks the true case would catch it.
+- A malformed filter blob degrades to the next layer instead of throwing. It is stored as
+  JSON, so it can be anything; a preference that has been hand-edited into nonsense should
+  cost the user their filter, not the page.
+
+Choosing a shape that can be executed changed what got verified. The same logic embedded in
+a service method would have been checked by reading it.
+
+### #26 — Two more shell mistakes that reported success
+
+Writing the settings DTOs, `cat > src/modules/settings/dto/settings.dto.ts` failed because
+the `dto` directory did not exist — and the script's final `echo "written"` ran anyway and
+said so. Identical in shape to entry #12, from a batch of file writes several phases
+earlier.
+
+Twice is a pattern rather than an accident, and the fix is not "be more careful". It is
+that a script which writes files should end by *listing what it wrote*, not by echoing that
+it wrote something. The verification and the claim have to be the same operation, or the
+claim is just a comment.

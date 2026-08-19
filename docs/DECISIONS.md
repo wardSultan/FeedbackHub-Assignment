@@ -460,3 +460,80 @@ this was written down.
 **Consequences.** Role changes serialise against each other, which at the frequency
 administrators are appointed costs nothing. The same pattern will be needed for account
 deletion, since deleting the last administrator is the same lockout by another route.
+
+---
+
+## ADR-0017 — One bootstrap call, and settings resolved on the server
+
+**Context.** The brief singles this out: it is interested in "where configuration lives,
+how it is resolved between global defaults and user overrides, and how the frontend obtains
+it without a chain of blocking requests on startup". Three questions.
+
+**Where it lives.** Four tiers, kept apart on purpose:
+
+| Tier | Example | Lives in | Changed by |
+|---|---|---|---|
+| Infrastructure | database URL, issuer URL, CORS origins | environment | operator, with a redeploy |
+| Application settings | registration policy, approval toggle, rate limits, global defaults | `app_settings` | administrator, at runtime |
+| Feature flags | `comments.enabled` | `feature_flags` | administrator, at runtime |
+| User overrides | theme, language, default sort and filters | `user_settings` | the user, at runtime |
+
+Conflating the last three is the usual mistake; separating them is most of the answer.
+
+**How it resolves.** `code default → global default → user override`, in
+`settings-resolution.ts`, as a pure function over plain data with no database and no
+framework — so the rule the brief asks about can be read and tested on its own.
+
+The rule that carries the weight: in `user_settings`, **NULL means inherit, not off**.
+That is what makes an administrator changing a global default reach every user who never
+customised it. Writing the defaults into each user's row at signup would look equivalent
+and would silently break it — which is why there is a test named for exactly that.
+
+Resolution happens once, on the server. A client that re-implemented the precedence would
+eventually disagree with it, and the disagreement would be invisible until a user saw two
+different themes in two places.
+
+**How the frontend gets it.** One `GET /bootstrap`, returning the user, resolved settings,
+feature flags and the taxonomy together. The failure mode it exists to avoid is the
+obvious implementation — `/me`, then `/settings`, then `/flags`, then `/categories`, then
+`/statuses` — five sequential round trips with a white screen for the sum of them. The
+handlers run concurrently inside the endpoint, because one round trip for the client is
+wasted if the server serialises internally.
+
+It is public. An anonymous caller gets the same shape with `user: null` and the global
+defaults, so the client never branches on whether anyone is signed in merely to lay the
+page out.
+
+**Consequences.** The payload is small and read on every page load, so it is a natural
+place to add an ETag later. Adding a field to it is easy and therefore tempting: it should
+carry what is needed to render the *first screen*, not everything that is convenient.
+
+---
+
+## ADR-0018 — Account deletion anonymises
+
+**Context.** Users can delete their account. What happens to the requests they filed, the
+comments other people replied to, and the votes other people cast on their requests?
+
+**Options.** Cascade and remove everything; keep the content and detach it; keep the row
+and scrub it.
+
+**Decision.** Keep the row, scrub the personal fields, mark it deleted. Content stays and
+renders as "Deleted user".
+
+**Why.** Cascading is the destructive option dressed up as the thorough one: it removes a
+discussion other people contributed to, and rewrites the vote counts other people created.
+Detaching content by nulling the author would need every foreign key to become nullable and
+every join to handle a missing row — a schema-wide cost for one operation.
+
+The email is rewritten rather than nulled because the column is NOT NULL and unique, and
+because the placeholder must not collide if the same person deletes an account twice. A
+consequence worth noting: the original address becomes free again, so the person can return
+as a genuinely new account rather than resurrecting the old one. Both are asserted in
+`prisma/checks/account-deletion.sql`.
+
+**Consequences.** The identity-provider account is *not* disabled, because doing so needs
+Keycloak admin credentials inside the API — a real expansion of what this service is
+trusted with, for a benefit that is mostly cosmetic given the local account is inactive.
+Listed as unfinished in `SCOPE.md` rather than half-done. Deleting the last administrator
+is refused under the same lock as demotion (ADR-0016).
