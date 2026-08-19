@@ -40,7 +40,9 @@ backend/            NestJS API
 frontend/           Angular application
   src/app/core/     Runtime config, OIDC auth, theme, API clients
   src/app/features/ Feature areas, lazily loaded
-infra/              Keycloak realm and database bootstrap
+infra/              Keycloak realm, database bootstrap, nginx config
+  k8s/base/         Kubernetes manifests
+  k8s/overlays/     Per-environment Kustomize overlays
 docs/               Decisions, scope, AI collaboration write-up
 ```
 
@@ -136,6 +138,15 @@ that needs nothing installed — it reads the source — and fails if any endpoi
 cd backend && npx tsx test/route-audit.ts
 ```
 
+The Kubernetes manifests get the same treatment — a check that needs nothing installed, for
+the cross-file mistakes a per-file review misses (a Service selector matching no pod, a
+`secretKeyRef` naming a key that does not exist, an Ingress pointing at a port that is not
+exposed):
+
+```bash
+python3 infra/k8s/validate.py
+```
+
 ## Where to look first
 
 A reviewer with forty minutes will not find the parts worth seeing by browsing. These are
@@ -190,10 +201,16 @@ the five that carry the most thought:
   run. Sources were type-checked with a standalone `tsc` and every diagnostic traced to a
   missing module. This is the honest state of the project and the first thing to check.
 
+**Built but never executed:**
+
+- Dockerfiles for both applications, a Compose stack covering the whole system, and
+  Kustomize manifests with a local overlay. No image was built and no cluster was applied —
+  no container registry was reachable. The Compose file validates via
+  `docker compose config`, and `python3 infra/k8s/validate.py` checks the manifests
+  structurally. Neither is the same as running them.
+
 **Not built:**
 
-- Deployment artefacts — Dockerfiles and Kubernetes manifests. `docker-compose.yml` exists
-  and brings up PostgreSQL and Keycloak.
 - The settings and administration screens. Their API endpoints are complete.
 - Registration policy and submission rate limits are stored and editable, but not yet
   enforced.

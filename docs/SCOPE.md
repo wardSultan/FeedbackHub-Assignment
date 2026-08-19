@@ -3,8 +3,9 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 9 — testing.** The settings and administration screens and the
-> deployment artefacts are still to come.
+> **Current status: all phases complete.** The settings and administration screens remain
+> unbuilt, and nothing in this repository has been compiled or containerised — see the
+> known gaps below.
 
 ---
 
@@ -34,6 +35,10 @@ ambiguity in the brief was interpreted.
 - **Comments** — create, edit own, delete own or moderate as an administrator, with the
   approval workflow and a visibility rule verified against the database: a pending comment
   is visible to its author and to administrators and to nobody else.
+- **Deployment artefacts** — multi-stage Dockerfiles for both applications, a Compose
+  stack that brings up the whole system with migrations gated as a one-shot job, and
+  Kustomize manifests with a base and a local overlay. Validated structurally by a
+  dependency-free checker verified against seven deliberate breakages.
 - **Authorization coverage** — all 39 endpoints in one table, with a dependency-free audit
   that fails if a route has no rule, a rule has no route, or the decorators disagree with
   the rule. Verified by breaking it three ways.
@@ -279,6 +284,10 @@ right trade for a setting whose entire purpose is that nothing appears unreviewe
 
 ## Known gaps
 
+- **Nothing has been built or deployed.** No image was built, no cluster was applied: the
+  environment could not reach any container registry. The Compose file validates and the
+  manifests pass a structural check, which is not the same as running. This and the point
+  below are the two things to verify first.
 - **The frontend has never been compiled.** The build environment cannot reach the npm
   registry, so no Angular dependency can be installed. Pure logic was executed directly
   under `node`; everything else is type-checked only. This is the largest unverified

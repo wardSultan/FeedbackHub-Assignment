@@ -1,0 +1,40 @@
+# Two hosts rather than one.
+#
+# Keycloak issues tokens whose `iss` claim is the URL the browser used to reach it. If
+# it were served under a path on the same host, the issuer the browser sees and the one
+# the API expects would diverge, and every token would fail validation for a reason
+# several layers from the error.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: feedbackhub
+  namespace: feedbackhub
+spec:
+  rules:
+    - host: feedbackhub.localhost
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
+    - host: auth.feedbackhub.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080

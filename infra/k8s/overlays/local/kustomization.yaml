@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: feedbackhub
+
+resources:
+  - ../../base
+
+# A local cluster has one node and no spare capacity, and images are loaded into it
+# rather than pulled. Everything else is inherited from the base unchanged, which is
+# the point of having an overlay rather than a second copy.
+replicas:
+  - name: api
+    count: 1
+  - name: web
+    count: 1
+
+images:
+  - name: feedbackhub/api
+    newTag: local
+  - name: feedbackhub/web
+    newTag: local
+
+patches:
+  - target:
+      kind: Deployment
+      name: api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Deployment
+      name: web
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never

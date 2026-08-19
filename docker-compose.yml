@@ -1,9 +1,10 @@
 # Local development stack.
 #
-# Only the backing services live here for now; the API and web containers arrive with
-# their Dockerfiles. Until then this is what `npm run start:dev` runs against.
-#
 #   cp .env.example .env && docker compose up -d
+#
+# Brings up PostgreSQL, Keycloak with the realm imported, the API, and the web
+# application. Migrations run as a one-shot service so two API replicas can never race
+# each other applying the same migration.
 #
 # Keycloak takes 30-60 seconds to become ready on a cold start. The healthcheck below is
 # what makes `depends_on: service_healthy` meaningful rather than decorative.
@@ -71,6 +72,55 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feedbackhub}:${POSTGRES_PASSWORD:-feedbackhub}@postgres:5432/${POSTGRES_DB:-feedbackhub}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Runs to completion and exits; the API waits for that rather than for a healthcheck.
+    restart: 'no'
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feedbackhub}:${POSTGRES_PASSWORD:-feedbackhub}@postgres:5432/${POSTGRES_DB:-feedbackhub}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-4200}
+      # The issuer must be the URL the *browser* used, because that is what ends up in
+      # the token's iss claim — not the in-container hostname.
+      KEYCLOAK_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/feedbackhub
+      KEYCLOAK_AUDIENCE: feedbackhub-api
+      BOOTSTRAP_ADMIN_EMAIL: admin@feedbackhub.local
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+    environment:
+      API_URL: http://localhost:${API_PORT:-3000}
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/feedbackhub
+      KEYCLOAK_CLIENT_ID: feedbackhub-web
+    ports:
+      - '${WEB_PORT:-4200}:8080'
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:
