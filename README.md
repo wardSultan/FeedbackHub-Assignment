@@ -61,6 +61,20 @@ The migration creates the schema and the reference data the application cannot s
 without: the app settings row, the default statuses and categories, and the feature
 flags. Demo content is separate and arrives with the seed script.
 
+The API foundation is in place but has not yet been compiled — see
+[`docs/SCOPE.md`](docs/SCOPE.md) for why. To build and run it:
+
+```bash
+cd backend
+cp .env.example .env      # adjust DATABASE_URL if needed
+npm install
+npm run prisma:generate
+npm run start:dev
+```
+
+`GET /health/live` and `GET /health/ready` are unversioned; everything else is served
+under `/api/v1`. Interactive API documentation is at `/api/docs` outside production.
+
 ## Running the tests
 
 The schema's guarantees are verified directly against PostgreSQL, below the application

@@ -3,14 +3,24 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 0 — project foundation.** Nothing is implemented yet. The
-> "Built" section below is empty on purpose and fills in as phases complete.
+> **Current status: Phase 1 — backend foundation.** Authentication, the domain modules
+> and the frontend are still to come.
 
 ---
 
 ## Built
 
-> Nothing yet — Phase 0 is repository foundation only.
+- **Database schema** — nine tables with the vote-uniqueness and derived-count invariants
+  enforced by the database rather than by application code, verified by 32 invariant
+  checks and a concurrency check that run against a real PostgreSQL instance.
+- **API foundation** — NestJS application skeleton: environment validation that refuses to
+  start on bad configuration, a Prisma module, RFC 9457 problem-details error handling,
+  field-level validation errors, mass-assignment protection, security headers, an explicit
+  CORS allowlist, and versioned routing with unversioned health probes.
+
+> The API foundation has not been compiled: the build environment cannot reach the npm
+> registry, so no dependency can be installed. It is syntax-checked only. This is stated
+> here rather than discovered by the next person to run `npm install`.
 
 ## Deliberately not built
 

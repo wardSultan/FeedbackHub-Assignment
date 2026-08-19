@@ -139,3 +139,63 @@ image. The web-fetch path *can* reach the registry, which is enough to read pack
 metadata and pin accurate versions — but not enough to install anything. So dependency
 versions can be stated from fact rather than recall; the code that uses them still cannot
 be compiled here.
+
+### #10 — Checking versions instead of recalling them changed two decisions
+
+Entry #2 committed to checking any version that ends up in a `package.json` against the
+registry rather than trusting recall. That rule earned its keep immediately.
+
+Recall would have produced Prisma 5 or 6 and TypeScript 5.x as unremarkable defaults. The
+registry says the current releases are Prisma **7.9.1** and TypeScript **7.0.2** — and both
+are breaking. Prisma 7 is ESM-only with mandatory driver adapters. TypeScript 7 is the
+native compiler port, and `ts-jest`'s peer range is `>=4.3 <7`, so adopting it silently
+breaks the test runner.
+
+Two things worth noting about how this went. First, the model's initial instinct was to
+write `"prisma": "^6"` and move on — which would have been *accidentally* right for the
+wrong reason, and would have looked like a stale guess rather than a decision. Second, the
+strongest signal for the TypeScript choice was not a version number but a dependency graph:
+`@nestjs/cli` itself depends on TypeScript 5.9.3, which is the combination NestJS is
+actually tested against.
+
+Both decisions are recorded in ADR-0011, with the raw version facts attached so the
+reasoning can be re-checked rather than taken on trust.
+
+### #11 — Compiling was impossible, so the next best check was used
+
+No dependency can be installed here, so the API foundation cannot be built. Rather than
+hand over code with nothing behind it, the globally available `tsc` was run directly over
+the sources with `--skipLibCheck`, and the output triaged by error code: everything
+reported was `TS2307` (missing module), `TS7006`/`TS18046`/`TS2339` (types that come from
+those missing modules) or `TS2593` (`@types/jest`). No syntax errors and no unexplained
+type errors.
+
+That is a real check, and it is worth being precise about what it does *not* prove: it
+cannot catch a wrong Nest decorator, a bad DI wiring, a Prisma client method that does not
+exist, or anything the type system would have caught with real definitions present. The
+foundation is marked in `SCOPE.md` as syntax-checked but not compiled, and that stands
+until someone runs `npm install && npm run build`.
+
+Two fixes came out of reading the code back rather than from any tool: the health
+controller was version-neutral only by accident of route ordering, so probe URLs would have
+moved to `/api/v1/health/*` once versioning was enabled — an infrastructure contract
+quietly changing under an application decision. And `bufferLogs: true` was copied in from
+the standard Nest bootstrap without the custom logger that makes it useful, where it does
+nothing but delay output.
+
+### #12 — A shell slip that reported success
+
+A batch of files was written with a `cd backend && cat > a.ts <<EOF ... cat > b.ts <<EOF`
+sequence. The `cd` failed, because the working directory was already `backend`. The `&&`
+bound only to the *first* `cat`, so that one file was silently skipped while every
+subsequent one wrote correctly — and the script still printed its success message at the
+end.
+
+Caught by listing the directory afterwards instead of trusting the echo. The missing file
+was an interface the other modules import, so it would have failed at first build with a
+confusing error some distance from the cause.
+
+Worth recording as a category rather than an incident: shell scripting that mixes `&&`
+with a sequence of independent commands produces exactly this — partial execution
+reported as success. Subsequent file batches use absolute paths and are verified by
+listing the result.
