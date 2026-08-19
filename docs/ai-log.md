@@ -352,3 +352,37 @@ comment stays visible to its author, so the rejection is not silent — a commen
 vanishes reads as a bug and gets re-posted. And a *deleted* comment is hidden even from an
 administrator, because moderation removing something should remove it, not archive it into
 a view only some people have.
+
+### #21 — The third variant of the same bug, and this one was caught by luck
+
+Running the full check suite after the comments phase, `schema-invariants.sql` reported
+16 passing checks where it had previously reported 32. It had not been touched. What had
+changed was the database: the demo seed now existed in it.
+
+Two assertions counted rows across the whole table rather than scoping to their own
+fixture:
+
+    (SELECT count(*) FROM feedback_requests r JOIN categories c ON c.id = r.category_id
+      WHERE c.slug = 'feature') = 1        -- retiring a category
+    (SELECT count(*) FROM feedback_requests
+      WHERE search_vector @@ websearch_to_tsquery('english', 'dark mode')) = 1
+
+Both were correct on an empty database and wrong the moment any other data existed — and
+the README tells the reader to seed *before* running the checks, so the documented order of
+operations was the one that broke them.
+
+Fixed by scoping the search assertions to the fixture row and by asserting the category
+count is *unchanged* rather than equal to one. Then verified properly, which is what should
+have happened the first time: on a clean database with only the migration; on the same
+database after seeding; and after seeding twice. All four suites pass in all three states.
+
+This is the third instance of the same underlying error in this project — after the
+ordering-dependent check in entry #7 and the tautology in #16. The shape is consistent: an
+assertion that passes for a reason other than the behaviour it names. Here the reason was
+ambient state, and it surfaced only because the count in the output happened to be
+memorable. That is not a detection strategy. The durable fix is the one applied above —
+every assertion scoped to data it created itself — rather than noticing.
+
+It is also the strongest argument in this project for running the suite in more than one
+state. A check suite that has only ever been run against one database is not a suite, it
+is a snapshot.

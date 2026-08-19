@@ -177,12 +177,25 @@ SELECT pg_temp.assert_rejects(
     'a status still referenced by a request cannot be deleted');
 
 -- Retiring is always allowed; it is the supported alternative to deletion.
+--
+-- Asserted as "unchanged" rather than as a fixed number on purpose: this file is run
+-- against a developer's database, which may or may not have the demo seed applied, and an
+-- absolute count would make the check depend on how much other data happens to exist.
+CREATE TEMP TABLE before_retire AS
+SELECT count(*) AS n FROM feedback_requests r
+  JOIN categories c ON c.id = r.category_id WHERE c.slug = 'feature';
+
 UPDATE categories SET is_active = FALSE WHERE slug = 'feature';
+
 SELECT pg_temp.assert(
-    (SELECT count(*) FROM feedback_requests r JOIN categories c ON c.id = r.category_id
-      WHERE c.slug = 'feature') = 1,
+    (SELECT n FROM before_retire) > 0
+    AND (SELECT count(*) FROM feedback_requests r
+           JOIN categories c ON c.id = r.category_id WHERE c.slug = 'feature')
+        = (SELECT n FROM before_retire),
     'retiring a category leaves existing requests intact');
+
 UPDATE categories SET is_active = TRUE WHERE slug = 'feature';
+DROP TABLE before_retire;
 
 \echo ''
 \echo 'validation and integrity constraints'
@@ -241,26 +254,32 @@ SELECT pg_temp.assert_rejects(
 -- Full-text search
 -- ---------------------------------------------------------------------------
 
+-- Every search assertion is scoped to the fixture row. Counting matches across the whole
+-- table would make the result depend on whether the demo seed happens to be present.
 SELECT pg_temp.assert(
     (SELECT count(*) FROM feedback_requests
-      WHERE search_vector @@ websearch_to_tsquery('english', 'dark mode')) = 1,
+      WHERE search_vector @@ websearch_to_tsquery('english', 'dark mode')
+        AND id = (SELECT id FROM fx WHERE name='request')) = 1,
     'full-text search matches on the title');
 
 SELECT pg_temp.assert(
     (SELECT count(*) FROM feedback_requests
-      WHERE search_vector @@ websearch_to_tsquery('english', 'unusable night')) = 1,
+      WHERE search_vector @@ websearch_to_tsquery('english', 'unusable night')
+        AND id = (SELECT id FROM fx WHERE name='request')) = 1,
     'full-text search matches on the description');
 
 SELECT pg_temp.assert(
     (SELECT count(*) FROM feedback_requests
-      WHERE search_vector @@ websearch_to_tsquery('english', 'kubernetes')) = 0,
+      WHERE search_vector @@ websearch_to_tsquery('english', 'kubernetes')
+        AND id = (SELECT id FROM fx WHERE name='request')) = 0,
     'full-text search does not match unrelated terms');
 
 -- The search input is user-supplied, so it has to survive hostile input rather than
 -- raising. websearch_to_tsquery never throws on malformed input, unlike to_tsquery.
 SELECT pg_temp.assert(
     (SELECT count(*) FROM feedback_requests
-      WHERE search_vector @@ websearch_to_tsquery('english', ''')); DROP TABLE users; --')) = 0,
+      WHERE search_vector @@ websearch_to_tsquery('english', ''')); DROP TABLE users; --')
+        AND id = (SELECT id FROM fx WHERE name='request')) = 0,
     'search survives SQL metacharacters without erroring');
 
 -- The generated column cannot drift from the content.
@@ -268,7 +287,8 @@ UPDATE feedback_requests SET title = 'Kubernetes manifests are missing'
  WHERE id = (SELECT id FROM fx WHERE name='request');
 SELECT pg_temp.assert(
     (SELECT count(*) FROM feedback_requests
-      WHERE search_vector @@ websearch_to_tsquery('english', 'kubernetes')) = 1,
+      WHERE search_vector @@ websearch_to_tsquery('english', 'kubernetes')
+        AND id = (SELECT id FROM fx WHERE name='request')) = 1,
     'the search vector updates when the title changes');
 
 \echo ''
