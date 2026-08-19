@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/
+
+# Build output
+dist/
+build/
+out-tsc/
+.angular/
+*.tsbuildinfo
+
+# Environment — never commit real values, only .env.example
+.env
+.env.*
+!.env.example
+
+# Test / coverage artefacts
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local data volumes
+.data/

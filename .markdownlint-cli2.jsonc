@@ -1,0 +1,10 @@
+{
+  // Markdown is the only lintable content until the backend lands in Phase 1.
+  "config": {
+    "MD013": { "line_length": 100, "tables": false, "code_blocks": false },
+    // The compact `|---|---|` table delimiter form is intentional and readable.
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["**/node_modules/**"]
+}
