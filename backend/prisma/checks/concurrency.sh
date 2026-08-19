@@ -83,4 +83,33 @@ if [[ "${rows}" != "${CONCURRENCY}" || "${count}" != "${CONCURRENCY}" ]]; then
 fi
 echo "   ok  ${rows} vote rows, vote_count = ${count} (no lost updates)"
 
-echo "Concurrency checks passed."
+# -- 3. Sequential idempotency ------------------------------------------------
+# The two statements below are what the vote endpoints emit: Prisma's
+# createMany({ skipDuplicates: true }) compiles to ON CONFLICT DO NOTHING, and
+# deleteMany to an unqualified DELETE. Both must be safe to repeat, because a retried
+# request and a double-clicked button are ordinary events, not errors.
+echo "3. repeating the same cast and withdraw"
+q "DELETE FROM votes WHERE request_id = '${REQUEST_ID}';" >/dev/null
+
+for _ in 1 2 3; do
+  q "INSERT INTO votes (request_id, user_id) VALUES ('${REQUEST_ID}', '${USER_ID}')
+     ON CONFLICT DO NOTHING;" >/dev/null
+done
+count=$(q "SELECT vote_count FROM feedback_requests WHERE id = '${REQUEST_ID}';")
+if [[ "${count}" != "1" ]]; then
+  echo "   FAILED: three casts should leave vote_count 1, got ${count}" >&2
+  exit 1
+fi
+echo "   ok  casting three times leaves one vote"
+
+for _ in 1 2 3; do
+  q "DELETE FROM votes WHERE request_id = '${REQUEST_ID}' AND user_id = '${USER_ID}';" >/dev/null
+done
+count=$(q "SELECT vote_count FROM feedback_requests WHERE id = '${REQUEST_ID}';")
+if [[ "${count}" != "0" ]]; then
+  echo "   FAILED: repeated withdrawal should leave vote_count 0, got ${count}" >&2
+  exit 1
+fi
+echo "   ok  withdrawing three times leaves no vote and does not go negative"
+
+echo "Concurrency and idempotency checks passed."

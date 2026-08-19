@@ -294,3 +294,26 @@ still never been compiled, so Prisma's binding of a JavaScript array to a
 was tested with real NULL and array binds through psql, so the risk is confined to the
 client's parameter handling — but it is the kind of assumption that should be checked by
 the first `npm run build`, not discovered later.
+
+### #18 — Voting: the smallest phase, and the one already proved
+
+Voting took less code than any phase so far, because the hard part was done in Phase 1. The
+"a user may vote at most once" rule is the composite primary key, and the counter is
+maintained by a trigger, so the service does almost nothing: insert ignoring conflicts,
+delete without complaint, read the count back.
+
+That is worth noticing rather than glossing over. The endpoints are trivial *because* the
+invariants were pushed into the database earlier — had they been left to application code,
+this phase would have needed a read-then-write guard, a transaction, a race to reason
+about, and tests to prove all three. The work did not disappear; it moved to where it could
+be stated once.
+
+Two properties are worth stating about the endpoint design. Neither method accepts a user
+id, so there is no ownership check to write and nothing for a caller to tamper with — the
+key *is* the authorization. And both are idempotent, which is a decision rather than an
+accident: a double-clicked button and a retried mobile request are ordinary events, and the
+honest response to both is the same final state and the same status code.
+
+The checks were extended with the exact statements the endpoints emit — `ON CONFLICT DO
+NOTHING` for a cast, an unqualified `DELETE` for a withdrawal — repeated three times each,
+asserting the count settles at one and then at zero without going negative.

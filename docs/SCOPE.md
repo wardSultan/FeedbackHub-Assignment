@@ -3,8 +3,8 @@
 What was built, what was deliberately left out, what another week would buy, and how every
 ambiguity in the brief was interpreted.
 
-> **Current status: Phase 3 — feedback requests.** Voting, comments, admin configuration
-> and the frontend are still to come.
+> **Current status: Phase 4 — voting.** Comments, admin configuration, settings and the
+> frontend are still to come.
 
 ---
 
@@ -27,6 +27,10 @@ ambiguity in the brief was interpreted.
   requests", pagination, and pinned-first ordering under every sort. Content editing,
   status changes and pinning are three endpoints with three different authorization rules
   rather than one endpoint with a permission matrix inside.
+- **Voting** — cast and withdraw, both idempotent, with the count read back from the
+  trigger-maintained column so an optimistic client can reconcile. Neither endpoint takes
+  a user identifier: the voter comes from the token and the composite primary key is the
+  "at most once" rule.
 - **Demo data** — an idempotent seed attributing content to the same accounts the Keycloak
   realm creates, so signing in lands on an account that already owns requests.
 - **API foundation** — NestJS application skeleton: environment validation that refuses to

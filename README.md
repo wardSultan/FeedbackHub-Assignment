@@ -104,7 +104,7 @@ psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/schema-inva
 # 24 checks over the list query: filters, sorts, search, pagination, per-viewer state.
 psql -d feedbackhub -qtA -v ON_ERROR_STOP=1 -f backend/prisma/checks/list-query.sql
 
-# Vote uniqueness and counter correctness under genuine concurrency.
+# Vote uniqueness, counter correctness under genuine concurrency, and idempotency.
 ./backend/prisma/checks/concurrency.sh
 ```
 
