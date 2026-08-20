@@ -162,6 +162,44 @@
         </div>
       </mat-tab>
 
+      <mat-tab [label]="'Moderation' + (pending().length ? ' (' + pending().length + ')' : '')">
+        <div class="tab">
+          <section class="card">
+            <p class="muted">
+              Comments waiting for approval, oldest first — the longest wait is dealt with
+              first. Their authors can already see them, badged as awaiting approval, so
+              nothing has silently disappeared from their point of view.
+            </p>
+
+            @if (pending().length === 0) {
+              <p class="empty">Nothing is waiting. The queue is clear.</p>
+            } @else {
+              <ul class="queue">
+                @for (comment of pending(); track comment.id) {
+                  <li>
+                    <div class="queued-body">
+                      <div class="queued-head">
+                        <strong>{{ comment.author.displayName }}</strong>
+                        <span class="slug">{{ comment.createdAt }}</span>
+                      </div>
+                      <p>{{ comment.body }}</p>
+                    </div>
+                    <div class="queued-actions">
+                      <button mat-stroked-button (click)="moderate(comment, 'APPROVED')">
+                        <mat-icon>check</mat-icon> Approve
+                      </button>
+                      <button mat-button (click)="moderate(comment, 'REJECTED')">
+                        Reject
+                      </button>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        </div>
+      </mat-tab>
+
       <mat-tab label="Feature flags">
         <div class="tab">
           <section class="card">
