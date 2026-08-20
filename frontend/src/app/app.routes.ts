@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { adminGuard, authGuard } from './core/auth/auth.guard';
 
 /**
  * Every feature is lazily loaded. The board is what people come for; the settings and
@@ -31,6 +31,20 @@ export const routes: Routes = [
       import('./features/feedback/detail/request-detail.component').then(
         (m) => m.RequestDetailComponent,
       ),
+  },
+  {
+    path: 'settings',
+    title: 'Settings — FeedbackHub',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+  },
+  {
+    path: 'admin',
+    title: 'Administration — FeedbackHub',
+    // Both guards are convenience only; every endpoint behind this screen decides again.
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/admin.component').then((m) => m.AdminComponent),
   },
   { path: '**', redirectTo: 'requests' },
 ];

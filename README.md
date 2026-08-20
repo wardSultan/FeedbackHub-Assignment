@@ -180,6 +180,11 @@ the five that carry the most thought:
   reload a request. The discussion disappears *and* `POST …/comments` returns 403.
 - `PATCH /api/v1/me` with `{"role": "ADMIN"}` returns 400 — the field is rejected, not
   ignored.
+- In **Settings**, change the theme, then set it back to "Use the default". The control
+  distinguishes choosing a value from inheriting one, which is the whole point of the
+  resolution model — and an administrator changing the global default then reaches you.
+- In **Administration → Feature flags**, toggle `comments.enabled` and go back to a
+  request. The discussion is gone and the endpoint refuses, without a reload.
 
 ## What works / what doesn't
 
@@ -211,9 +216,11 @@ the five that carry the most thought:
 
 **Not built:**
 
-- The settings and administration screens. Their API endpoints are complete.
-- Registration policy and submission rate limits are stored and editable, but not yet
-  enforced.
+- Registration policy and submission rate limits are stored and editable through the
+  administration screen, but not yet enforced at sign-in or on submission. The screen says
+  so where it offers them, rather than implying they work.
+- The comment moderation queue exists as an API but has no screen; comments can be approved
+  through `PATCH /api/v1/admin/comments/:id/moderation`.
 
 The full list, with reasoning, is in [`docs/SCOPE.md`](docs/SCOPE.md).
 

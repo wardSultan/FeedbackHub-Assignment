@@ -42,6 +42,11 @@ ambiguity in the brief was interpreted.
 - **Authorization coverage** — all 39 endpoints in one table, with a dependency-free audit
   that fails if a route has no rule, a rule has no route, or the decorators disagree with
   the rule. Verified by breaking it three ways.
+- **Settings and administration screens** — the preferences screen shows both layers of
+  the settings model, with "Use the default" as a real option on every control so an
+  override can be cleared and the global default becomes reachable again. The
+  administration screen covers taxonomy (retire versus delete), application settings and
+  feature-flag toggles that take effect without a reload.
 - **Frontend** — Angular 22 with signals and no global store: the application shell,
   runtime configuration, OIDC sign-in, light/dark/system theming without a flash on load,
   and the board itself — search, status and category filters, five sorts, pagination and
@@ -292,8 +297,6 @@ right trade for a setting whose entire purpose is that nothing appears unreviewe
   registry, so no Angular dependency can be installed. Pure logic was executed directly
   under `node`; everything else is type-checked only. This is the largest unverified
   surface in the project and the first thing a reviewer should run.
-- The settings and administration screens are not built. Their API endpoints are complete
-  and documented in OpenAPI, so the gap is user interface only.
 - Deleting an account does not disable the corresponding Keycloak account. Doing so
   requires identity-provider admin credentials inside the API, which is a real expansion of
   what the service is trusted with; the local account is inactive and cannot authenticate,

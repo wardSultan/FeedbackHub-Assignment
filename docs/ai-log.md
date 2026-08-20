@@ -604,3 +604,21 @@ the cross-file mistakes that per-file review misses.
 
 The honest boundary, stated in `SCOPE.md` rather than implied: the Dockerfiles have never
 been built and the manifests have never been applied. A structural check is not a cluster.
+
+### #34 — Building the screen that makes an invisible design visible
+
+The settings model has been in place since Phase 7: three layers, with NULL meaning
+*inherit*. Until this screen existed it was only assertable in tests, because a user
+interface that shows "Dark" cannot say whether that is a choice or an inheritance — and
+without that distinction there is no way back to the default, so the global setting becomes
+unreachable the moment anyone touches anything.
+
+Every control therefore offers "Use the default" as a real option that sends `null`, with a
+hint showing what is currently being inherited. That is a small amount of interface for a
+model that was already built and already tested, and it is the difference between the
+design being implemented and the design being usable.
+
+Worth noting as the counterpart to a recurring theme in this log: most entries here are
+about checks that claimed more than they proved. This is the opposite — a piece of work
+that was genuinely correct and genuinely proven, and still not *finished*, because nothing
+exposed it to the person it was for.
