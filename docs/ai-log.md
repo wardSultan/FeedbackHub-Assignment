@@ -622,3 +622,47 @@ Worth noting as the counterpart to a recurring theme in this log: most entries h
 about checks that claimed more than they proved. This is the opposite — a piece of work
 that was genuinely correct and genuinely proven, and still not *finished*, because nothing
 exposed it to the person it was for.
+
+### #35 — Both inert settings made real, and a genuine type error found
+
+Two administrator settings had been stored and editable since Phase 7 without doing
+anything: the registration policy and the submission limit. A setting that changes nothing
+is a dead control — the same objection raised against the language preference in Phase 8 —
+so both were enforced.
+
+The registration rule was written as a pure function and executed before being wired in.
+Nineteen cases, and three of them are the reason it is not a one-liner: an `endsWith`
+implementation of "is this domain allowed" also admits `evil-acme.com`,
+`acme.com.attacker.net` and `acme.com.co`. Exact membership refuses all three. This is the
+classic form of the check and the classic way it is bypassed, and it costs nothing to get
+right if it is tested at the point of writing rather than reviewed later.
+
+A twentieth case matters for a different reason: an *existing* user is admitted regardless
+of the policy. Tightening a policy governs who may join; applying it to people already here
+would make a configuration change silently revoke access.
+
+**A real type error surfaced**, which is worth noting because it is the first in this
+project that was not a missing-module artifact: `TS2366, function lacks ending return
+statement`. The switch covered all three policy values but had no terminal branch. With
+Prisma's types resolved it would probably have compiled through exhaustiveness narrowing —
+but "probably compiles" is not a property a security check should rely on, so it now has a
+default branch that **fails closed**. A gate with no terminal branch is one new enum value
+away from being no gate at all.
+
+### #36 — A verification that matched its own explanation
+
+Checking the fix, a quick `grep` asserted "exact match used (no endsWith)" and reported
+**false** — implying the vulnerable comparison was still there.
+
+It was not. `endsWith` appears exactly once in the file, inside the comment explaining why
+it must not be used. The grep matched the warning about the bug rather than the bug.
+
+Sixth instance in this project of a check reporting something other than what it claimed,
+and the cheapest one yet to have believed: the "fix" would have been to rewrite code that
+was already correct. Resolved in seconds by looking at the lines rather than the count —
+which is the same resolution as entry #29, where the route audit misreported an endpoint's
+guard.
+
+The consistent lesson across all six: **a check and the thing it checks are two artefacts,
+and the check is not automatically the trustworthy one.** When they disagree, the first
+question is which of the two is wrong.

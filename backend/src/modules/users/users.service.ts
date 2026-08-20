@@ -1,10 +1,19 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { User, UserRole } from '@prisma/client';
 import type { Env } from '../../platform/config/env';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import type { Principal, TokenClaims } from '../auth/principal';
 import type { ListUsersDto } from './admin-users.controller';
+import { SettingsService } from '../settings/settings.service';
+import { decideRegistration } from './registration-policy';
 
 export interface AdminUserView {
   id: string;
@@ -22,6 +31,7 @@ export class UsersService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
     config: ConfigService<Env, true>,
   ) {
     this.bootstrapAdminEmail = config
@@ -40,6 +50,27 @@ export class UsersService {
   async provisionFromClaims(claims: TokenClaims): Promise<User> {
     const email = (claims.email ?? claims.preferred_username ?? '').toLowerCase();
     const displayName = this.displayNameFrom(claims, email);
+
+    // The registration policy is an application setting, so this is where it is enforced.
+    // Keycloak will have created the account happily; this decides whether it may exist
+    // here. Existing users are unaffected, so tightening the policy never evicts anyone.
+    const existing = await this.prisma.user.findUnique({
+      where: { idpSubject: claims.sub },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      const app = await this.settings.getAppSettings();
+      const decision = decideRegistration(email, false, {
+        policy: app.registrationPolicy,
+        allowedEmailDomains: app.allowedEmailDomains,
+      });
+
+      if (!decision.allowed) {
+        this.logger.warn(`Refused provisioning for ${email}: ${decision.reason}`);
+        throw new ForbiddenException(decision.reason);
+      }
+    }
 
     const user = await this.prisma.user.upsert({
       where: { idpSubject: claims.sub },
