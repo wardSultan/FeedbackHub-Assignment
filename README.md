@@ -216,11 +216,8 @@ the five that carry the most thought:
 
 **Not built:**
 
-- Registration policy and submission rate limits are stored and editable through the
-  administration screen, but not yet enforced at sign-in or on submission. The screen says
-  so where it offers them, rather than implying they work.
-- The comment moderation queue exists as an API but has no screen; comments can be approved
-  through `PATCH /api/v1/admin/comments/:id/moderation`.
+- The comment moderation queue exists as an API but has no dedicated screen; comments are
+  approved through `PATCH /api/v1/admin/comments/:id/moderation`.
 
 The full list, with reasoning, is in [`docs/SCOPE.md`](docs/SCOPE.md).
 

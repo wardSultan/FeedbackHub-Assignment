@@ -54,6 +54,11 @@ ambiguity in the brief was interpreted.
   components, and the two empty states are distinguished. Request detail with the
   discussion, and the submission form with server errors mapped onto the fields that caused
   them.
+- **Registration policy and submission limits** — both enforced, not merely stored. Domain
+  restriction uses exact matching, so `evil-acme.com` and `acme.com.attacker.net` are
+  refused where an `endsWith` check would admit them; existing users are never evicted by a
+  policy change; and deleted requests still count against the submission limit, so deleting
+  does not reset the budget.
 - **Configuration** — three-layer resolution (code default, global default, user override)
   as a pure function, exposed through one `GET /bootstrap` that also carries the user,
   feature flags and taxonomy, so the client makes a single call before first render.
@@ -301,9 +306,8 @@ right trade for a setting whose entire purpose is that nothing appears unreviewe
   requires identity-provider admin credentials inside the API, which is a real expansion of
   what the service is trusted with; the local account is inactive and cannot authenticate,
   so the practical effect is limited. See ADR-0018.
-- The registration policy (`OPEN` / `INVITE_ONLY` / `DOMAIN_RESTRICTED`) is stored and
-  editable but not yet enforced at provisioning time.
-- Submission rate limits are stored and editable but not yet applied to request creation.
+- The comment moderation queue exists as an API but has no dedicated screen. Comments are
+  approved through `PATCH /api/v1/admin/comments/:id/moderation`.
 
 ## Environment assumptions
 

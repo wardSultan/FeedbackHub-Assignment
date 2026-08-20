@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { assertCanDelete, assertCanEditContent } from '../auth/ownership';
 import type { Principal } from '../auth/principal';
@@ -7,6 +13,7 @@ import type {
   CreateFeedbackRequestDto,
   UpdateFeedbackRequestDto,
 } from './dto/write-feedback-request.dto';
+import { SettingsService } from '../settings/settings.service';
 import { FeedbackRepository, type FeedbackRequestRow } from './feedback.repository';
 
 export interface FeedbackRequestView {
@@ -40,6 +47,7 @@ export class FeedbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repository: FeedbackRepository,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(
@@ -92,7 +100,48 @@ export class FeedbackService {
    * votes from its own author reads as broken. Recorded as an interpretation in
    * docs/SCOPE.md, A-16, because the brief does not say either way.
    */
+  /**
+   * The administrator-configurable submission limit.
+   *
+   * Distinct from the global throttle in front of the API: that one protects the
+   * infrastructure from any caller, this is a *product* rule about how much one person may
+   * file. Conflating them is a common miss — they have different owners, different units
+   * and different reasons to change.
+   *
+   * Deleted requests still count. Otherwise the limit is bypassed by submitting, deleting
+   * and submitting again, which is neither obscure nor hard to discover.
+   *
+   * Two simultaneous submissions can both pass this check and take the count one over the
+   * limit. That is accepted rather than locked against: this is a courtesy rule about
+   * volume, not a security boundary, and serialising every submission to enforce it
+   * exactly would cost more than the off-by-one is worth.
+   */
+  private async assertWithinSubmissionLimit(principal: Principal): Promise<void> {
+    const { submissionLimitCount, submissionLimitWindowHours } =
+      await this.settings.getAppSettings();
+
+    const since = new Date(Date.now() - submissionLimitWindowHours * 60 * 60 * 1000);
+
+    const recent = await this.prisma.feedbackRequest.count({
+      where: { authorId: principal.userId, createdAt: { gte: since } },
+    });
+
+    if (recent >= submissionLimitCount) {
+      throw new HttpException(
+        {
+          message:
+            `You have submitted ${recent} requests in the last ` +
+            `${submissionLimitWindowHours} hours, which is the current limit. ` +
+            `Please try again later.`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
   async create(principal: Principal, dto: CreateFeedbackRequestDto): Promise<FeedbackRequestView> {
+    await this.assertWithinSubmissionLimit(principal);
+
     const [category, status] = await Promise.all([
       this.prisma.category.findFirst({ where: { slug: dto.categorySlug, isActive: true } }),
       this.prisma.status.findFirst({ where: { isDefault: true } }),
