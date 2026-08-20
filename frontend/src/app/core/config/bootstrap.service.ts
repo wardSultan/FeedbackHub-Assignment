@@ -11,6 +11,10 @@ export interface TaxonomyTerm {
   slug: string;
   name: string;
   color: string;
+  /** Only present on the administrative endpoints, which return retired terms too. */
+  isActive?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
 }
 
 export interface BootstrapPayload {

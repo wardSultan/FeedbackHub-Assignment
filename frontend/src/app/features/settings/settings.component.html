@@ -1,0 +1,96 @@
+<div class="page">
+  <h1>Settings</h1>
+
+  @if (loading()) {
+    <fh-loading-list [count]="2" />
+  } @else if (error()) {
+    <fh-error-state title="Settings unavailable" [message]="error()!" (retry)="load()" />
+  } @else if (settings(); as state) {
+    <section class="card" aria-labelledby="profile-heading">
+      <h2 id="profile-heading">Profile</h2>
+      <div class="row">
+        <mat-form-field appearance="outline">
+          <mat-label>Display name</mat-label>
+          <input matInput name="displayName" [ngModel]="displayName()"
+                 (ngModelChange)="displayName.set($event)" />
+          <mat-hint>How your name appears on requests and comments.</mat-hint>
+        </mat-form-field>
+        <button mat-stroked-button [disabled]="saving() || !displayName().trim()"
+                (click)="saveProfile()">Save</button>
+      </div>
+      <p class="muted">Signed in as {{ bootstrap.user()?.email }}.</p>
+    </section>
+
+    <section class="card" aria-labelledby="prefs-heading">
+      <h2 id="prefs-heading">Preferences</h2>
+      <p class="muted">
+        Anything left on “Use the default” follows the setting an administrator has chosen,
+        and keeps following it if they change it.
+      </p>
+
+      <div class="field">
+        <mat-form-field appearance="outline">
+          <mat-label>Theme</mat-label>
+          <mat-select [value]="state.overrides.theme"
+                      (valueChange)="patch({ theme: $event })">
+            @for (option of themes; track option.label) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (inherited('theme')) {
+          <span class="inherited">Currently {{ state.effective.theme | lowercase }} — the default</span>
+        }
+      </div>
+
+      <div class="field">
+        <mat-form-field appearance="outline">
+          <mat-label>Default sort</mat-label>
+          <mat-select [value]="state.overrides.defaultSort"
+                      (valueChange)="patch({ defaultSort: $event })">
+            @for (option of sorts; track option.label) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (inherited('defaultSort')) {
+          <span class="inherited">Following the default</span>
+        }
+      </div>
+
+      <div class="field">
+        <mat-form-field appearance="outline">
+          <mat-label>Language</mat-label>
+          <mat-select [value]="state.overrides.language"
+                      (valueChange)="patch({ language: $event })">
+            <mat-option [value]="null">Use the default</mat-option>
+            <mat-option value="en">English</mat-option>
+          </mat-select>
+          <mat-hint>Only English is translated so far.</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="toggle">
+        <mat-slide-toggle [checked]="state.effective.notifyOnComment"
+                          (change)="patch({ notifyOnComment: $event.checked })">
+          Email me when someone comments on my requests
+        </mat-slide-toggle>
+        @if (inherited('notifyOnComment')) {
+          <span class="inherited">Following the default</span>
+        }
+      </div>
+    </section>
+
+    <section class="card danger" aria-labelledby="danger-heading">
+      <h2 id="danger-heading">Delete account</h2>
+      <p class="muted">
+        Your requests and comments stay on the board, attributed to “Deleted user”, so
+        discussions other people took part in are not broken. This cannot be undone.
+      </p>
+      <button mat-stroked-button color="warn" (click)="deleteAccount()">
+        <mat-icon>delete_forever</mat-icon>
+        Delete my account
+      </button>
+    </section>
+  }
+</div>

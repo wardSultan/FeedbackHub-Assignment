@@ -1,0 +1,192 @@
+<div class="page">
+  <h1>Administration</h1>
+
+  @if (loading()) {
+    <fh-loading-list [count]="3" />
+  } @else if (error()) {
+    <fh-error-state title="Administration unavailable" [message]="error()!" (retry)="load()" />
+  } @else {
+    <mat-tab-group>
+      <mat-tab label="Taxonomy">
+        <div class="tab">
+          <section class="card">
+            <h2>Categories</h2>
+            <p class="muted">
+              Retiring a category hides it from the submission form and leaves it on the
+              requests that already use it. Deleting is refused while it is still in use.
+            </p>
+            <ul class="terms">
+              @for (term of categories(); track term.id) {
+                <li [class.retired]="term.isActive === false">
+                  <span class="name">{{ term.name }}</span>
+                  <code class="slug">{{ term.slug }}</code>
+                  @if (term.isActive === false) { <span class="badge">Retired</span> }
+                  <span class="grow"></span>
+                  <button mat-button (click)="setActive('categories', term, term.isActive === false)">
+                    {{ term.isActive === false ? 'Restore' : 'Retire' }}
+                  </button>
+                  <button mat-icon-button aria-label="Delete category"
+                          (click)="deleteTerm('categories', term)">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+            <form class="add" (ngSubmit)="addTerm('categories')">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>New category</mat-label>
+                <input matInput name="newCategory" [ngModel]="newCategory()"
+                       (ngModelChange)="newCategory.set($event)" />
+              </mat-form-field>
+              <button mat-flat-button type="submit" [disabled]="!newCategory().trim()">Add</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <h2>Statuses</h2>
+            <p class="muted">
+              New requests receive the default status. Exactly one status is the default,
+              and it cannot be retired or deleted while it holds that role.
+            </p>
+            <ul class="terms">
+              @for (term of statuses(); track term.id) {
+                <li [class.retired]="term.isActive === false">
+                  <span class="name">{{ term.name }}</span>
+                  <code class="slug">{{ term.slug }}</code>
+                  @if (term.isDefault) { <span class="badge default">Default</span> }
+                  @if (term.isActive === false) { <span class="badge">Retired</span> }
+                  <span class="grow"></span>
+                  @if (!term.isDefault) {
+                    <button mat-button (click)="makeDefault(term)">Make default</button>
+                    <button mat-button (click)="setActive('statuses', term, term.isActive === false)">
+                      {{ term.isActive === false ? 'Restore' : 'Retire' }}
+                    </button>
+                    <button mat-icon-button aria-label="Delete status"
+                            (click)="deleteTerm('statuses', term)">
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+            <form class="add" (ngSubmit)="addTerm('statuses')">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>New status</mat-label>
+                <input matInput name="newStatus" [ngModel]="newStatus()"
+                       (ngModelChange)="newStatus.set($event)" />
+              </mat-form-field>
+              <button mat-flat-button type="submit" [disabled]="!newStatus().trim()">Add</button>
+            </form>
+          </section>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Settings">
+        <div class="tab">
+          @if (settings(); as app) {
+            <section class="card">
+              <h2>Registration</h2>
+              <mat-form-field appearance="outline" class="wide">
+                <mat-label>Who may join</mat-label>
+                <mat-select [value]="app.registrationPolicy"
+                            (valueChange)="saveSettings({ registrationPolicy: $event })">
+                  @for (policy of policies; track policy.value) {
+                    <mat-option [value]="policy.value">{{ policy.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <p class="muted note">
+                Stored and editable, but not yet enforced at sign-in — see
+                <code>docs/SCOPE.md</code>.
+              </p>
+            </section>
+
+            <section class="card">
+              <h2>Moderation</h2>
+              <mat-slide-toggle [checked]="app.commentsRequireApproval"
+                                (change)="saveSettings({ commentsRequireApproval: $event.checked })">
+                Comments require approval before they appear
+              </mat-slide-toggle>
+              <p class="muted note">
+                When on, a comment is visible only to its author and to administrators until
+                it is approved. Editing an approved comment returns it to the queue.
+              </p>
+            </section>
+
+            <section class="card">
+              <h2>Submission limit</h2>
+              <div class="row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Requests per user</mat-label>
+                  <input matInput type="number" min="1" [value]="app.submissionLimitCount"
+                         (change)="saveSettings({ submissionLimitCount: +$any($event.target).value })" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Per (hours)</mat-label>
+                  <input matInput type="number" min="1" [value]="app.submissionLimitWindowHours"
+                         (change)="saveSettings({ submissionLimitWindowHours: +$any($event.target).value })" />
+                </mat-form-field>
+              </div>
+            </section>
+
+            <section class="card">
+              <h2>Defaults for everyone</h2>
+              <p class="muted">
+                What a user sees when they have not chosen for themselves. Changing these
+                reaches everyone who has never overridden them.
+              </p>
+              <div class="row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Theme</mat-label>
+                  <mat-select [value]="app.defaultTheme"
+                              (valueChange)="saveSettings({ defaultTheme: $event })">
+                    <mat-option value="SYSTEM">Match system</mat-option>
+                    <mat-option value="LIGHT">Light</mat-option>
+                    <mat-option value="DARK">Dark</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Sort</mat-label>
+                  <mat-select [value]="app.defaultSort"
+                              (valueChange)="saveSettings({ defaultSort: $event })">
+                    <mat-option value="NEWEST">Newest</mat-option>
+                    <mat-option value="OLDEST">Oldest</mat-option>
+                    <mat-option value="MOST_VOTED">Most voted</mat-option>
+                    <mat-option value="MOST_COMMENTED">Most discussed</mat-option>
+                    <mat-option value="RECENTLY_UPDATED">Recently updated</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </section>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Feature flags">
+        <div class="tab">
+          <section class="card">
+            <p class="muted">
+              Flags take effect immediately, on the server as well as in this interface.
+              Turning one off makes the corresponding endpoints refuse — a flag that only
+              hid a button would not be a flag.
+            </p>
+            <ul class="flags">
+              @for (flag of flags(); track flag.key) {
+                <li>
+                  <div>
+                    <strong>{{ flag.name }}</strong>
+                    <code class="slug">{{ flag.key }}</code>
+                    <p class="muted">{{ flag.description }}</p>
+                  </div>
+                  <mat-slide-toggle [checked]="flag.enabled"
+                                    [attr.aria-label]="'Enable ' + flag.name"
+                                    (change)="toggleFlag(flag, $event.checked)" />
+                </li>
+              }
+            </ul>
+          </section>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>

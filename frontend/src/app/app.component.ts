@@ -26,6 +26,9 @@ import { ThemeService } from './core/theme/theme.service';
       <nav class="nav" aria-label="Main">
         <a routerLink="/requests" routerLinkActive="active"
            [routerLinkActiveOptions]="{ exact: true }">Board</a>
+        @if (bootstrap.isAdmin()) {
+          <a routerLink="/admin" routerLinkActive="active">Administration</a>
+        }
       </nav>
 
       <div class="spacer"></div>
@@ -48,6 +51,7 @@ import { ThemeService } from './core/theme/theme.service';
           {{ bootstrap.user()?.displayName }}
         </button>
         <mat-menu #userMenu="matMenu">
+          <a mat-menu-item routerLink="/settings">Settings</a>
           <button mat-menu-item (click)="auth.signOut()">Sign out</button>
         </mat-menu>
       } @else {
