@@ -216,8 +216,10 @@ the five that carry the most thought:
 
 **Not built:**
 
-- The comment moderation queue exists as an API but has no dedicated screen; comments are
-  approved through `PATCH /api/v1/admin/comments/:id/moderation`.
+- Email notifications are stored as a preference and honoured as far as an outbox record;
+  no mail is actually sent.
+- Only English is translated. The language preference is stored and resolved, but a second
+  locale was not written.
 
 The full list, with reasoning, is in [`docs/SCOPE.md`](docs/SCOPE.md).
 

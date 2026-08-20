@@ -63,3 +63,21 @@ h1 { margin: 0 0 1rem; font-size: 1.5rem; }
 }
 
 .add { display: flex; gap: 0.5rem; align-items: center; }
+
+.empty { color: var(--fh-text-muted); margin: 0; }
+
+.queue { list-style: none; margin: 0; padding: 0; }
+
+.queue li {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--fh-border);
+
+  &:last-child { border-bottom: none; }
+}
+
+.queued-body { flex: 1; min-width: 0; p { margin: 0.35rem 0 0; white-space: pre-wrap; } }
+.queued-head { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+.queued-actions { display: flex; gap: 0.4rem; flex: none; }

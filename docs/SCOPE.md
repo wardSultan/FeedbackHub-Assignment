@@ -66,6 +66,8 @@ ambiguity in the brief was interpreted.
   overrides, where clearing returns the setting to the current global.
 - **Account deletion** — anonymises the row rather than cascading, so other people's
   threads and vote counts survive. Refused for the last administrator.
+- **Comment moderation** — a queue of everything awaiting approval, oldest first, with
+  approve and reject in place.
 - **Administration** — taxonomy management with retire-versus-delete and an atomic default
   status swap, a comment moderation queue, and user role changes with both lockout routes
   closed. Grouped under `/admin` as routes rather than as a module.
@@ -306,8 +308,6 @@ right trade for a setting whose entire purpose is that nothing appears unreviewe
   requires identity-provider admin credentials inside the API, which is a real expansion of
   what the service is trusted with; the local account is inactive and cannot authenticate,
   so the practical effect is limited. See ADR-0018.
-- The comment moderation queue exists as an API but has no dedicated screen. Comments are
-  approved through `PATCH /api/v1/admin/comments/:id/moderation`.
 
 ## Environment assumptions
 

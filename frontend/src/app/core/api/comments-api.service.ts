@@ -34,4 +34,20 @@ export class CommentsApiService {
   remove(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/comments/${id}`);
   }
+
+  /**
+   * The moderation queue. Not gated on the comments feature flag, deliberately: switching
+   * comments off while items are queued must not strand them with no way to resolve them.
+   */
+  pending(page = 1): Observable<Paged<CommentView>> {
+    return this.http.get<Paged<CommentView>>(`${this.base}/admin/comments/pending`, {
+      params: new HttpParams().set('page', page).set('pageSize', 50),
+    });
+  }
+
+  moderate(id: string, status: 'APPROVED' | 'REJECTED'): Observable<CommentView> {
+    return this.http.patch<CommentView>(`${this.base}/admin/comments/${id}/moderation`, {
+      status,
+    });
+  }
 }

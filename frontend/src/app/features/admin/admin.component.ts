@@ -9,6 +9,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { forkJoin } from 'rxjs';
+import { CommentsApiService, type CommentView } from '../../core/api/comments-api.service';
 import {
   SettingsApiService,
   type AppSettings,
@@ -41,6 +42,7 @@ type TermKind = 'categories' | 'statuses';
 })
 export class AdminComponent {
   private readonly api = inject(SettingsApiService);
+  private readonly commentsApi = inject(CommentsApiService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly bootstrap = inject(BootstrapService);
 
@@ -51,6 +53,7 @@ export class AdminComponent {
   protected readonly statuses = signal<TaxonomyTerm[]>([]);
   protected readonly settings = signal<AppSettings | null>(null);
   protected readonly flags = signal<FeatureFlag[]>([]);
+  protected readonly pending = signal<CommentView[]>([]);
 
   protected readonly newCategory = signal('');
   protected readonly newStatus = signal('');
@@ -74,12 +77,14 @@ export class AdminComponent {
       statuses: this.api.allStatuses(),
       settings: this.api.appSettings(),
       flags: this.api.featureFlags(),
+      pending: this.commentsApi.pending(),
     }).subscribe({
-      next: ({ categories, statuses, settings, flags }) => {
+      next: ({ categories, statuses, settings, flags, pending }) => {
         this.categories.set(categories);
         this.statuses.set(statuses);
         this.settings.set(settings);
         this.flags.set(flags);
+        this.pending.set(pending.items);
         this.loading.set(false);
       },
       error: (error: unknown) => {
@@ -128,6 +133,25 @@ export class AdminComponent {
     this.api.deleteTerm(kind, term.id).subscribe({
       next: () => this.reloadTaxonomy(),
       error: (error: unknown) => this.report(error, 'That term could not be deleted.'),
+    });
+  }
+
+  /**
+   * Approving or rejecting removes the comment from the queue in place rather than
+   * refetching. The queue is the administrator's working list, and reloading it under them
+   * loses their position each time they clear an item.
+   */
+  protected moderate(comment: CommentView, status: 'APPROVED' | 'REJECTED'): void {
+    this.commentsApi.moderate(comment.id, status).subscribe({
+      next: () => {
+        this.pending.update((all) => all.filter((c) => c.id !== comment.id));
+        this.snackBar.open(
+          status === 'APPROVED' ? 'Comment approved.' : 'Comment rejected.',
+          undefined,
+          { duration: 2500 },
+        );
+      },
+      error: (error: unknown) => this.report(error, 'That comment could not be moderated.'),
     });
   }
 
