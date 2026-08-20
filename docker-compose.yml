@@ -112,7 +112,8 @@ services:
 
   web:
     build:
-      context: ./frontend
+       context: .
+       dockerfile: ./frontend/Dockerfile
     environment:
       API_URL: http://localhost:${API_PORT:-3000}
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/feedbackhub

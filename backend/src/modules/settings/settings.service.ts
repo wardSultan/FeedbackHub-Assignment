@@ -75,36 +75,56 @@ export class SettingsService {
    * which is the same thing as a row of NULLs — and not writing one keeps "has this person
    * ever expressed a preference" answerable.
    */
-  async updateUserSettings(
-    userId: string,
-    dto: UpdateUserSettingsDto,
-  ): Promise<{ overrides: UserOverrides; effective: EffectiveSettings }> {
-    const data = {
-      theme: dto.theme,
-      language: dto.language,
-      defaultSort: dto.defaultSort,
-      defaultFilters: dto.defaultFilters === null ? Prisma.DbNull : dto.defaultFilters,
-      notifyOnComment: dto.notifyOnComment,
-    };
 
-    await this.prisma.userSettings.upsert({
-      where: { userId },
-      update: data,
-      create: { userId, ...data },
-    });
+async updateUserSettings(
+  userId: string,
+  dto: UpdateUserSettingsDto,
+): Promise<{ overrides: UserOverrides; effective: EffectiveSettings }> {
+  const data = {
+    theme: dto.theme,
+    language: dto.language,
+    defaultSort: dto.defaultSort,
 
-    return this.getUserSettings(userId);
-  }
+    defaultFilters:
+      dto.defaultFilters === null
+        ? Prisma.DbNull
+        : dto.defaultFilters !== undefined
+          ? (dto.defaultFilters as Prisma.InputJsonValue)
+          : undefined,
 
-  async updateAppSettings(dto: UpdateAppSettingsDto, updatedById: string): Promise<AppSettings> {
-    const current = await this.getAppSettings();
+    notifyOnComment: dto.notifyOnComment,
+  };
 
-    return this.prisma.appSettings.update({
-      where: { id: current.id },
-      data: { ...dto, updatedById },
-    });
-  }
+  await this.prisma.userSettings.upsert({
+    where: { userId },
+    update: data,
+    create: {
+      userId,
+      ...data,
+    },
+  });
 
+  return this.getUserSettings(userId);
+}
+async updateAppSettings(
+  dto: UpdateAppSettingsDto,
+  updatedById: string,
+): Promise<AppSettings> {
+  const current = await this.getAppSettings();
+
+  const { defaultFilters, ...rest } = dto;
+
+  return this.prisma.appSettings.update({
+    where: { id: current.id },
+    data: {
+      ...rest,
+      updatedById,
+      ...(defaultFilters !== undefined && {
+        defaultFilters: defaultFilters as Prisma.InputJsonValue,
+      }),
+    },
+  });
+}
   async setFeatureFlag(key: string, enabled: boolean, updatedById: string): Promise<void> {
     const flag = await this.prisma.featureFlag.findUnique({ where: { key } });
 
