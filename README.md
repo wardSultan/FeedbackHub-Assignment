@@ -71,13 +71,46 @@ realm arrives pre-configured with the SPA client and three demo accounts:
 
 | Account | Password | Notes |
 |---|---|---|
-| `admin@feedbackhub.local` | `Passw0rd!demo` | Provisioned as an administrator on first sign-in |
+| `admin@feedbackhub.local` | `Passw0rd!demo` | Seeded as an administrator on every start — see below |
 | `user@feedbackhub.local` | `Passw0rd!demo` | Ordinary user |
 | `second@feedbackhub.local` | `Passw0rd!demo` | A second user, for checking that one user cannot edit another's content |
 
+There is no sign-in or registration endpoint on the API — Keycloak issues the tokens, and
+the local account is created on the first authenticated request. To exercise that path from
+a shell, `infra/scripts/kc-token.sh` walks the real authorization-code + PKCE flow and
+prints an access token:
+
+```bash
+./infra/scripts/kc-token.sh admin@feedbackhub.local 'Passw0rd!demo'
+./infra/scripts/kc-token.sh --register someone@example.com 'Passw0rd!new'   # sign-up
+
+curl -H "Authorization: Bearer $(./infra/scripts/kc-token.sh user@feedbackhub.local 'Passw0rd!demo')"      http://localhost:3000/api/v1/me
+```
+
+### The administrator account
+
+`BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in `.env` are the administrator's
+credentials, and the API reconciles them on every start: it creates the account in
+Keycloak if it is missing, sets its password to the configured value, and makes the
+matching local record an administrator. It is idempotent, so restarting changes nothing,
+and it is a repair as well as a seed — an administrator who was demoted, deactivated or
+deleted is restored on the next boot rather than leaving a board nobody can administer.
+
+Change the values in `.env` and restart to move the account to a different address. The
+password is authoritative: an account whose password was changed in Keycloak has it reset
+to the environment's value at the next start. Leaving `BOOTSTRAP_ADMIN_PASSWORD` empty
+turns the whole thing off, and the email alone still promotes that person the first time
+they sign in.
+
+Seeding needs realm-administrator credentials — `KEYCLOAK_ADMIN_USERNAME` and
+`KEYCLOAK_ADMIN_PASSWORD` — which are used by nothing else in the API and reach only
+`src/modules/users/keycloak-admin.client.ts`.
+
 The migration creates the schema plus the reference data the application cannot start
 without — the settings row, the default statuses and categories, and the feature flags.
-Demo content is separate, in `prisma/seed.sql`, and is safe to re-run.
+Demo content is separate, in `prisma/seed.sql`, and is safe to re-run. Under Docker the
+`seed` service applies it after the migration and before the API starts, so the board has
+an administrator from the first boot; running it by hand is only needed outside compose.
 
 ```bash
 cd backend

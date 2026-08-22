@@ -86,6 +86,31 @@ services:
     # Runs to completion and exits; the API waits for that rather than for a healthcheck.
     restart: 'no'
 
+  seed:
+    # Demo content, including the administrator account. Runs after the migration and
+    # before the API, so a fresh `docker compose up` produces a board that already has an
+    # administrator rather than one that only gains one if somebody happens to sign in
+    # with the bootstrap address.
+    #
+    # The postgres image is used rather than the API image because psql lives there and
+    # the API's runtime stage deliberately ships no npm. The seed is idempotent, so
+    # running it on every start is a no-op once the rows exist.
+    image: postgres:16-alpine
+    entrypoint: ['psql', '-v', 'ON_ERROR_STOP=1', '-f', '/seed/seed.sql']
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-feedbackhub}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-feedbackhub}
+      PGDATABASE: ${POSTGRES_DB:-feedbackhub}
+    volumes:
+      - ./backend/prisma/seed.sql:/seed/seed.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: 'no'
+
   api:
     build:
       context: ./backend
@@ -98,7 +123,15 @@ services:
       # the token's iss claim — not the in-container hostname.
       KEYCLOAK_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/feedbackhub
       KEYCLOAK_AUDIENCE: feedbackhub-api
-      BOOTSTRAP_ADMIN_EMAIL: admin@feedbackhub.local
+      # ...whereas the API itself reaches Keycloak over the compose network, where
+      # `localhost` is its own container. Used only by the administrator bootstrap.
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # The administrator is seeded from these on every start: the account is created in
+      # Keycloak if missing and its local record is made an administrator.
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@feedbackhub.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Passw0rd!demo}
     ports:
       - '${API_PORT:-3000}:3000'
     depends_on:
@@ -107,6 +140,8 @@ services:
       keycloak:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      seed:
         condition: service_completed_successfully
     restart: unless-stopped
 

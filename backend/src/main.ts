@@ -37,11 +37,32 @@ async function bootstrap(): Promise<void> {
       app,
       new DocumentBuilder()
         .setTitle('FeedbackHub API')
-        .setDescription('Internal product feedback board.')
+        .setDescription(
+          'Internal product feedback board.\n\n' +
+            'This API is an OAuth2 resource server: it verifies bearer tokens and never ' +
+            'sees a password, so there is no sign-in or registration endpoint here. ' +
+            'Keycloak issues the tokens — sign in through the web application, or take ' +
+            'one from the realm directly, then paste it into **Authorize** above.',
+        )
         .setVersion('1')
+        // Declares the scheme the `@ApiBearerAuth()` on every controller refers to.
+        // Without it those references name a scheme the document does not define, and
+        // Swagger UI renders no Authorize button at all — every protected endpoint then
+        // answers 401 from "Try it out", which reads as broken auth rather than a
+        // missing token. The name is the default `bearer` the decorator uses.
+        .addBearerAuth({
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Access token issued by the Keycloak realm.',
+        })
         .build(),
     );
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup('api/docs', app, document, {
+      // Survives the page reload that "Try it out" triggers, so the token is pasted once
+      // per session rather than once per request.
+      swaggerOptions: { persistAuthorization: true },
+    });
   }
 
   const port = config.get('PORT', { infer: true });
