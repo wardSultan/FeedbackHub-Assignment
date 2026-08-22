@@ -42,6 +42,13 @@ services:
       KC_HOSTNAME_STRICT: 'false'
       KC_HTTP_ENABLED: 'true'
       KC_HEALTH_ENABLED: 'true'
+      # Substituted into the realm file at import: it carries `${GOOGLE_*}` placeholders
+      # rather than credentials, so nothing secret is committed. Google sign-in stays off
+      # until a client id and secret are supplied, which keeps a fresh clone's login page
+      # free of a button that cannot work.
+      GOOGLE_SSO_ENABLED: ${GOOGLE_SSO_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not-configured}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-not-configured}
     ports:
       - '${KEYCLOAK_PORT:-8080}:8080'
     volumes:
@@ -153,6 +160,9 @@ services:
       API_URL: http://localhost:${API_PORT:-3000}
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/feedbackhub
       KEYCLOAK_CLIENT_ID: feedbackhub-web
+      # Decides whether the application offers its own "Continue with Google" button.
+      # Keycloak's own login page shows one regardless once the provider is enabled.
+      GOOGLE_SSO_ENABLED: ${GOOGLE_SSO_ENABLED:-false}
     ports:
       - '${WEB_PORT:-4200}:8080'
     depends_on:

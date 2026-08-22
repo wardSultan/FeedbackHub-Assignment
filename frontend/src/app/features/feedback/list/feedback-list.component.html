@@ -26,23 +26,34 @@
   </form>
 
   <div class="filters">
-    <mat-chip-listbox aria-label="Filter by status" multiple>
-      @for (status of bootstrap.statuses(); track status.slug) {
-        <mat-chip-option [selected]="query().statuses.includes(status.slug)"
-                         (selectionChange)="toggleStatus(status.slug)">
-          {{ status.name }}
-        </mat-chip-option>
-      }
-    </mat-chip-listbox>
+    <!-- The label is visible rather than an aria-label. Two unlabelled rows of chips are
+         indistinguishable from each other on screen: everyone has to infer that the first
+         row is statuses and the second is categories, and the filter reads as absent to
+         anyone who does not. `aria-labelledby` points at the same text so it is announced
+         once, not twice. -->
+    <div class="filter-group">
+      <span class="filter-label" id="status-filter-label">Status</span>
+      <mat-chip-listbox aria-labelledby="status-filter-label" multiple>
+        @for (status of bootstrap.statuses(); track status.slug) {
+          <mat-chip-option [selected]="query().statuses.includes(status.slug)"
+                           (selectionChange)="toggleStatus(status.slug)">
+            {{ status.name }}
+          </mat-chip-option>
+        }
+      </mat-chip-listbox>
+    </div>
 
-    <mat-chip-listbox aria-label="Filter by category" multiple>
-      @for (category of bootstrap.categories(); track category.slug) {
-        <mat-chip-option [selected]="query().categories.includes(category.slug)"
-                         (selectionChange)="toggleCategory(category.slug)">
-          {{ category.name }}
-        </mat-chip-option>
-      }
-    </mat-chip-listbox>
+    <div class="filter-group">
+      <span class="filter-label" id="category-filter-label">Category</span>
+      <mat-chip-listbox aria-labelledby="category-filter-label" multiple>
+        @for (category of bootstrap.categories(); track category.slug) {
+          <mat-chip-option [selected]="query().categories.includes(category.slug)"
+                           (selectionChange)="toggleCategory(category.slug)">
+            {{ category.name }}
+          </mat-chip-option>
+        }
+      </mat-chip-listbox>
+    </div>
 
     <div class="filters-trailing">
       @if (bootstrap.isSignedIn()) {
@@ -75,6 +86,15 @@
       title="The board could not be loaded"
       message="The API may still be starting up. Check that docker compose is running."
       (retry)="fetch()" />
+  } @else if (beyondEnd()) {
+    <!-- Not an empty board and not an empty filter: there are matches, just not on this
+         page. A stale link or a filter applied under an old page number lands here. -->
+    <fh-empty-state
+      icon="last_page"
+      title="That page is past the end"
+      [message]="'This view has ' + pages() + ' page' + (pages() === 1 ? '' : 's') + '.'"
+      actionLabel="Back to the first page"
+      (action)="goToPage(1)" />
   } @else if (items().length === 0) {
     <!-- Two genuinely different situations. Showing "no results" on an empty board tells
          the user to change filters they never set; showing "be the first" on a filtered
@@ -94,9 +114,22 @@
         [actionLabel]="bootstrap.isSignedIn() ? 'Submit a request' : null" />
     }
   } @else {
-    <p class="result-count" aria-live="polite">
-      {{ result()?.total }} request{{ result()?.total === 1 ? '' : 's' }}
-    </p>
+    <div class="result-bar">
+      <p class="result-count" aria-live="polite">
+        {{ result()?.total }} request{{ result()?.total === 1 ? '' : 's' }}
+      </p>
+
+      @if ((result()?.total ?? 0) > pageSizes[0]) {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="page-size-field">
+          <mat-label>Per page</mat-label>
+          <mat-select [value]="query().pageSize" (valueChange)="setPageSize($event)">
+            @for (size of pageSizes; track size) {
+              <mat-option [value]="size">{{ size }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+    </div>
 
     <ul class="request-list">
       @for (request of items(); track request.id) {
@@ -106,18 +139,32 @@
       }
     </ul>
 
-    @if (query().page > 1 || result()?.hasNext) {
+    @if (pages() > 1) {
       <nav class="pager" aria-label="Pagination">
+        <button mat-stroked-button [disabled]="query().page === 1"
+                (click)="goToPage(1)" aria-label="First page">
+          <mat-icon>first_page</mat-icon>
+        </button>
         <button mat-stroked-button [disabled]="query().page === 1"
                 (click)="goToPage(query().page - 1)">
           <mat-icon>chevron_left</mat-icon>
           Previous
         </button>
-        <span>Page {{ query().page }}</span>
+
+        <!-- Announced on change so a screen reader hears the new position rather than
+             only the list silently replacing itself. -->
+        <span class="pager-position" aria-live="polite">
+          Page {{ query().page }} of {{ pages() }}
+        </span>
+
         <button mat-stroked-button [disabled]="!result()?.hasNext"
                 (click)="goToPage(query().page + 1)">
           Next
           <mat-icon>chevron_right</mat-icon>
+        </button>
+        <button mat-stroked-button [disabled]="query().page >= pages()"
+                (click)="goToPage(pages())" aria-label="Last page">
+          <mat-icon>last_page</mat-icon>
         </button>
       </nav>
     }

@@ -14,6 +14,12 @@ export interface RuntimeConfig {
   keycloak: {
     issuer: string;
     clientId: string;
+    /**
+     * Whether the realm has Google sign-in configured. Keycloak's own login page shows
+     * the provider regardless; this only decides whether the application offers a direct
+     * button, which would otherwise lead people to a provider that is not set up.
+     */
+    googleSso?: boolean;
   };
 }
 

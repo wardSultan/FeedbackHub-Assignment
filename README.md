@@ -22,7 +22,7 @@ visible what is actually being worked on.
 | Frontend | Angular + Angular Material/CDK, signals, URL-driven list state |
 | Backend | NestJS (modular monolith), REST + OpenAPI |
 | Database | PostgreSQL + Prisma |
-| Identity | Keycloak (OIDC — email/password + one social provider) |
+| Identity | Keycloak (OIDC — email/password, plus Google when credentials are supplied) |
 | Local dev | Docker Compose |
 | Deployment | Container images + Kubernetes manifests |
 
@@ -86,6 +86,40 @@ prints an access token:
 
 curl -H "Authorization: Bearer $(./infra/scripts/kc-token.sh user@feedbackhub.local 'Passw0rd!demo')"      http://localhost:3000/api/v1/me
 ```
+
+### Social login
+
+The realm ships a Google identity provider, disabled. It carries `${GOOGLE_*}` placeholders
+rather than credentials, which Keycloak substitutes from the environment at import — so
+nothing secret is committed and a clone with no Google project gets an ordinary login page
+rather than a button that fails when clicked.
+
+To turn it on, create an OAuth client at
+[Google Cloud credentials](https://console.cloud.google.com/apis/credentials) with this
+authorised redirect URI:
+
+```text
+http://localhost:8080/realms/feedbackhub/broker/google/endpoint
+```
+
+then set all three values in `.env`:
+
+```bash
+GOOGLE_SSO_ENABLED=true
+GOOGLE_CLIENT_ID=<client id>.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=<client secret>
+```
+
+**The realm must be re-imported for this to take effect.** `--import-realm` skips a realm
+that already exists, so on a stack that has run before, either delete the `feedbackhub`
+realm in the Keycloak admin console and restart the container, or `docker compose down -v`
+(which also destroys the database). A first run needs neither.
+
+Keycloak's login page then offers Google, and the application offers a direct
+"Continue with Google" button that skips straight to it via `kc_idp_hint`. Signing in that
+way still goes through the application's own registration policy — a Google account on a
+domain the board does not allow is created in Keycloak and then refused provisioning here,
+which is the split described in `docs/SCOPE.md`, A-4.
 
 ### The administrator account
 

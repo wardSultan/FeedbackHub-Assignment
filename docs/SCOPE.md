@@ -18,6 +18,12 @@ ambiguity in the brief was interpreted.
   with PKCE, an audience mapper so tokens carry a verifiable `aud`, brute-force protection,
   and three seeded demo accounts. Verified by importing it into a real Keycloak 26.5 and
   decoding an issued token.
+- **Social login** — a Google identity provider in the same realm file, configured from the
+  environment at import so no credential is committed, and disabled unless a client id and
+  secret are supplied. The application offers a direct "Continue with Google" button that
+  skips the realm's form via `kc_idp_hint`. Verified against Keycloak 26.5 in both states:
+  with credentials the provider imports enabled and the login page renders the button; with
+  none the realm imports clean and the login page carries no social markup at all.
 - **Authentication and authorization** — token verification against the realm's JWKS with a
   pinned algorithm, just-in-time user provisioning, globally applied guards with an explicit
   public opt-out, and ownership rules as pure functions with unit tests.
@@ -49,9 +55,13 @@ ambiguity in the brief was interpreted.
   feature-flag toggles that take effect without a reload.
 - **Frontend** — Angular 22 with signals and no global store: the application shell,
   runtime configuration, OIDC sign-in, light/dark/system theming without a flash on load,
-  and the board itself — search, status and category filters, five sorts, pagination and
-  optimistic voting, all driven from the URL. Loading, empty and error states are shared
-  components, and the two empty states are distinguished. Request detail with the
+  and the board itself — search, status and category filters, five sorts, pagination with a
+  selectable page size and optimistic voting, all driven from the URL. Loading, empty and
+  error states are shared components, and the three empty states are distinguished: an
+  empty board, a filter that matches nothing, and a page number past the end. Request
+  detail carries an administrator triage panel — status, pin and delete — shown on the
+  request itself rather than in a separate console, because triage is a judgement about
+  one request made while reading it. Request detail with the
   discussion, and the submission form with server errors mapped onto the fields that caused
   them.
 - **Registration policy and submission limits** — both enforced, not merely stored. Domain

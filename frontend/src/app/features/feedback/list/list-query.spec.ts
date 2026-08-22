@@ -1,4 +1,11 @@
-import { hasActiveFilters, parseListQuery, toQueryParams, type ListDefaults } from './list-query';
+import {
+  DEFAULT_PAGE_SIZE,
+  hasActiveFilters,
+  pageCount,
+  parseListQuery,
+  toQueryParams,
+  type ListDefaults,
+} from './list-query';
 
 const plain: ListDefaults = { sort: 'NEWEST', statuses: [], categories: [] };
 const personalised: ListDefaults = {
@@ -16,6 +23,7 @@ describe('parseListQuery', () => {
       mine: false,
       sort: 'MOST_VOTED',
       page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
     });
   });
 
@@ -61,6 +69,7 @@ describe('toQueryParams', () => {
       mine: null,
       sort: null,
       page: null,
+      pageSize: null,
     });
   });
 
@@ -73,13 +82,22 @@ describe('toQueryParams', () => {
       mine: null,
       sort: 'OLDEST',
       page: '3',
+      pageSize: null,
     });
   });
 });
 
 describe('round trip', () => {
   const cases = [
-    { q: null, statuses: [], categories: [], mine: false, sort: 'NEWEST' as const, page: 1 },
+    {
+      q: null,
+      statuses: [],
+      categories: [],
+      mine: false,
+      sort: 'NEWEST' as const,
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+    },
     {
       q: 'dark mode',
       statuses: ['new', 'planned'],
@@ -87,8 +105,17 @@ describe('round trip', () => {
       mine: true,
       sort: 'MOST_VOTED' as const,
       page: 4,
+      pageSize: 50 as const,
     },
-    { q: null, statuses: [], categories: ['feature'], mine: false, sort: 'OLDEST' as const, page: 1 },
+    {
+      q: null,
+      statuses: [],
+      categories: ['feature'],
+      mine: false,
+      sort: 'OLDEST' as const,
+      page: 1,
+      pageSize: 10 as const,
+    },
   ];
 
   // The URL *is* the state, so anything lost in conversion is state the user loses on
@@ -111,5 +138,40 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters(parseListQuery({ q: 'dark' }, plain))).toBe(true);
     expect(hasActiveFilters(parseListQuery({ status: 'new' }, plain))).toBe(true);
     expect(hasActiveFilters(parseListQuery({ mine: 'true' }, plain))).toBe(true);
+  });
+});
+
+describe('page size', () => {
+  it('defaults when the URL says nothing', () => {
+    expect(parseListQuery({}, plain).pageSize).toBe(DEFAULT_PAGE_SIZE);
+  });
+
+  it('accepts an offered size', () => {
+    expect(parseListQuery({ pageSize: '50' }, plain).pageSize).toBe(50);
+  });
+
+  // The API answers 400 above 100, so a value from outside the set has to degrade here or
+  // the address bar becomes a way to produce an error page.
+  ['5000', '0', '-20', '7', 'lots', ''].forEach((value) => {
+    it(`falls back for ${JSON.stringify(value)}`, () => {
+      expect(parseListQuery({ pageSize: value }, plain).pageSize).toBe(DEFAULT_PAGE_SIZE);
+    });
+  });
+
+  it('is omitted from the URL when it is the default', () => {
+    expect(toQueryParams(parseListQuery({}, plain), plain)['pageSize']).toBeNull();
+    expect(toQueryParams(parseListQuery({ pageSize: '50' }, plain), plain)['pageSize']).toBe('50');
+  });
+});
+
+describe('pageCount', () => {
+  it('rounds a partial last page up', () => {
+    expect(pageCount(41, 20)).toBe(3);
+    expect(pageCount(40, 20)).toBe(2);
+  });
+
+  // One page, not zero: the pager reads "Page 1 of 1" rather than "Page 1 of 0".
+  it('never reports fewer than one page', () => {
+    expect(pageCount(0, 20)).toBe(1);
   });
 });

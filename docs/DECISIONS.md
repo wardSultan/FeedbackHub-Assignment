@@ -108,8 +108,16 @@ is most likely to recognise.
 - It is the heaviest option: JVM, roughly 600 MB–1 GB of memory, slow cold start. Mitigated
   with a healthcheck and `depends_on: service_healthy` so the API waits for it, and a note
   in the README about first-boot time.
-- Social login needs real OAuth client credentials, which cannot be committed. Handling of
-  that is an open question tracked in `SCOPE.md`.
+- Social login needs real OAuth client credentials, which cannot be committed. Resolved by
+  committing the Google provider with `${GOOGLE_CLIENT_ID}` / `${GOOGLE_CLIENT_SECRET}`
+  placeholders, which Keycloak substitutes from the environment at realm import, and
+  leaving it disabled by default via `${GOOGLE_SSO_ENABLED:false}`. The realm stays
+  reproducible, the secrets stay out of the repository, and a clone with no Google project
+  gets a working login page instead of a provider that cannot complete. Verified against
+  Keycloak 26.5: substitution, the `:default` fallback, and boolean coercion of a
+  substituted `enabled` all behave as relied on here.
+- The trade-off is that changing the provider needs the realm re-imported, because
+  `--import-realm` ignores a realm that already exists. Documented in the README.
 
 ---
 

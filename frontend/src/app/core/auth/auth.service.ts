@@ -46,8 +46,23 @@ export class AuthService {
     return this.oauth.hasValidAccessToken();
   }
 
-  signIn(): void {
-    this.oauth.initCodeFlow();
+  /**
+   * Starts the redirect to Keycloak.
+   *
+   * `idpHint` is Keycloak's `kc_idp_hint`: it skips the realm's login form and goes
+   * straight to that identity provider, which is what makes a "Continue with Google"
+   * button land on Google rather than on a page with a Google button on it. Omitted, the
+   * realm's own login page is shown, which is where email and password are entered.
+   */
+  signIn(idpHint?: string): void {
+    this.oauth.initCodeFlow(undefined, idpHint ? { kc_idp_hint: idpHint } : {});
+  }
+
+  get googleSsoEnabled(): boolean {
+    // Defaulted rather than assumed present: `config.json` is written by the container
+    // entrypoint in Docker but is a hand-maintained file for `ng serve`, so a copy
+    // predating this flag must read as "off" rather than as `undefined`.
+    return this.config.keycloak.googleSso ?? false;
   }
 
   signOut(): void {

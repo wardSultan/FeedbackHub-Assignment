@@ -5,7 +5,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { RouterLink } from '@angular/router';
+import { MatSelectModule } from '@angular/material/select';
+import { Router, RouterLink } from '@angular/router';
 import { CommentsApiService, type CommentView } from '../../../core/api/comments-api.service';
 import {
   FeedbackApiService,
@@ -32,6 +33,7 @@ export const COMMENTS_FEATURE = 'comments.enabled';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatSelectModule,
     LoadingListComponent,
     EmptyStateComponent,
     ErrorStateComponent,
@@ -43,6 +45,7 @@ export const COMMENTS_FEATURE = 'comments.enabled';
 export class RequestDetailComponent {
   private readonly api = inject(FeedbackApiService);
   private readonly commentsApi = inject(CommentsApiService);
+  private readonly router = inject(Router);
   protected readonly bootstrap = inject(BootstrapService);
 
   /** Bound from the route by withComponentInputBinding(). */
@@ -63,6 +66,30 @@ export class RequestDetailComponent {
    * the same flag, which is what stops anyone with a terminal from posting anyway.
    */
   protected readonly commentsEnabled = computed(() => this.bootstrap.isEnabled(COMMENTS_FEATURE));
+
+  /** Triage controls. In flight, and the last failure, kept apart from the comment form. */
+  protected readonly triaging = signal(false);
+  protected readonly triageError = signal<string | null>(null);
+
+  /**
+   * Statuses an administrator may move a request to.
+   *
+   * Retired statuses are filtered out: they still have to render on requests already
+   * carrying them — that is what "retire rather than delete" is for — but offering one as
+   * a destination would let the board be filled with a status the taxonomy has withdrawn.
+   */
+  protected readonly assignableStatuses = computed(() =>
+    this.bootstrap.statuses().filter((status) => status.isActive !== false),
+  );
+
+  /**
+   * Whether to show the triage panel at all.
+   *
+   * A hint, not the control. Every endpoint behind these buttons re-decides the same
+   * question, so hiding them saves an administrator-only affordance from cluttering
+   * everyone else's screen and nothing more.
+   */
+  protected readonly canTriage = computed(() => this.bootstrap.isAdmin());
 
   constructor() {
     queueMicrotask(() => this.load());
@@ -113,6 +140,75 @@ export class RequestDetailComponent {
       error: (error: unknown) => {
         this.posting.set(false);
         this.commentError.set(messageFrom(error, 'Your comment could not be posted.'));
+      },
+    });
+  }
+
+  protected setStatus(statusSlug: string): void {
+    const current = this.request();
+
+    // The select emits on programmatic value changes too; without this, re-rendering the
+    // panel after a successful change would fire a second identical request.
+    if (!current || this.triaging() || statusSlug === current.status.slug) {
+      return;
+    }
+
+    this.applyTriage(this.api.setStatus(this.id(), statusSlug), 'The status could not be changed.');
+  }
+
+  protected togglePinned(): void {
+    const current = this.request();
+
+    if (!current || this.triaging()) {
+      return;
+    }
+
+    this.applyTriage(
+      this.api.setPinned(this.id(), !current.isPinned),
+      'The request could not be pinned.',
+    );
+  }
+
+  protected deleteRequest(): void {
+    if (this.triaging() || !confirm('Delete this request? This cannot be undone.')) {
+      return;
+    }
+
+    this.triaging.set(true);
+    this.triageError.set(null);
+
+    this.api.remove(this.id()).subscribe({
+      // The request is gone, so staying on its page would show a 404 on the next reload.
+      next: () => void this.router.navigate(['/requests']),
+      error: (error: unknown) => {
+        this.triaging.set(false);
+        this.triageError.set(messageFrom(error, 'The request could not be deleted.'));
+      },
+    });
+  }
+
+  /**
+   * Shared tail for the triage calls.
+   *
+   * Each returns the whole updated request and the response replaces the local copy, so
+   * what is on screen is what the server stored — no optimistic guess to reconcile, which
+   * matters here because a status change can be refused by rules the client does not know.
+   */
+  private applyTriage(
+    call: ReturnType<FeedbackApiService['setStatus']>,
+    fallback: string,
+  ): void {
+    this.triaging.set(true);
+    this.triageError.set(null);
+
+    call.subscribe({
+      next: (updated) => {
+        this.request.set(updated);
+        this.triaging.set(false);
+      },
+      error: (error: unknown) => {
+        this.triaging.set(false);
+        this.triageError.set(messageFrom(error, fallback));
       },
     });
   }

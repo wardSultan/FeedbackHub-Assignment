@@ -56,6 +56,11 @@ import { ThemeService } from './core/theme/theme.service';
         </mat-menu>
       } @else {
         <button mat-flat-button (click)="auth.signIn()">Sign in</button>
+        @if (auth.googleSsoEnabled) {
+          <button mat-stroked-button (click)="auth.signIn('google')">
+            Continue with Google
+          </button>
+        }
       }
     </header>
 

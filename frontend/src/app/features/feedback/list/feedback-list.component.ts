@@ -17,9 +17,15 @@ import {
   LoadingListComponent,
 } from '../../../shared/ui/state-views.component';
 import { RequestCardComponent } from './request-card.component';
-import { LIST_SORTS, hasActiveFilters, parseListQuery, toQueryParams } from './list-query';
-
-const PAGE_SIZE = 20;
+import {
+  LIST_SORTS,
+  PAGE_SIZES,
+  hasActiveFilters,
+  pageCount,
+  parseListQuery,
+  toQueryParams,
+} from './list-query';
+import type { PageSize } from './list-query';
 
 /**
  * The board.
@@ -56,6 +62,7 @@ export class FeedbackListComponent {
   protected readonly bootstrap = inject(BootstrapService);
 
   protected readonly sorts = LIST_SORTS;
+  protected readonly pageSizes = PAGE_SIZES;
   protected readonly sortLabels: Record<string, string> = {
     NEWEST: 'Newest',
     OLDEST: 'Oldest',
@@ -103,7 +110,7 @@ export class FeedbackListComponent {
     this.loading.set(true);
     this.error.set(false);
 
-    this.api.list(this.query(), PAGE_SIZE).subscribe({
+    this.api.list(this.query()).subscribe({
       next: (page) => {
         this.requests.set(page.items);
         this.result.set({ items: page.items, total: page.total, hasNext: page.hasNext });
@@ -144,8 +151,36 @@ export class FeedbackListComponent {
     this.patch({ mine: !this.query().mine, page: 1 });
   }
 
+  /** Total pages for the current result set — the "of 7" in "Page 3 of 7". */
+  protected readonly pages = computed(() => {
+    const result = this.result();
+    return result ? pageCount(result.total, this.query().pageSize) : 1;
+  });
+
+  /**
+   * A page number past the last page.
+   *
+   * Worth distinguishing from an empty result: the board has matches, this page just is
+   * not one of them — usually a stale link, or a filter narrowing the list under a page
+   * number that was valid a moment ago. Telling someone "no requests yet" there is simply
+   * false, and offers them no way back.
+   */
+  protected readonly beyondEnd = computed(() => {
+    const result = this.result();
+    return result !== null && result.total > 0 && this.query().page > this.pages();
+  });
+
   protected goToPage(page: number): void {
     this.patch({ page });
+    // A new page starts at the top. Without this the browser keeps the old offset and the
+    // next page appears already scrolled halfway down.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected setPageSize(pageSize: PageSize): void {
+    // Back to the first page: page 4 of 20-per-page is nowhere near page 4 of 100, and
+    // keeping the number would drop the reader somewhere they did not ask to be.
+    this.patch({ pageSize, page: 1 });
   }
 
   protected clearFilters(): void {

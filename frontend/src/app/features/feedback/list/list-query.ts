@@ -20,6 +20,20 @@ export const LIST_SORTS = [
 
 export type ListSort = (typeof LIST_SORTS)[number];
 
+/**
+ * The page sizes offered, and the only ones accepted from a URL.
+ *
+ * A fixed set rather than any number: the API caps `pageSize` at 100 and answers 400 above
+ * it, so an arbitrary `?pageSize=5000` typed into the address bar would turn into an error
+ * page instead of a list. Restricting it here means a nonsense value degrades to the
+ * default, the same way an unrecognised sort does.
+ */
+export const PAGE_SIZES = [10, 20, 50, 100] as const;
+
+export type PageSize = (typeof PAGE_SIZES)[number];
+
+export const DEFAULT_PAGE_SIZE: PageSize = 20;
+
 export interface ListQuery {
   q: string | null;
   statuses: string[];
@@ -27,6 +41,7 @@ export interface ListQuery {
   mine: boolean;
   sort: ListSort;
   page: number;
+  pageSize: PageSize;
 }
 
 /** What the user's settings say, used for anything the URL does not specify. */
@@ -62,6 +77,11 @@ function parsePage(value: string | undefined | null): number {
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
+function parsePageSize(value: string | undefined | null): PageSize {
+  const size = Number(value);
+  return (PAGE_SIZES as readonly number[]).includes(size) ? (size as PageSize) : DEFAULT_PAGE_SIZE;
+}
+
 export function parseListQuery(params: RawParams, defaults: ListDefaults): ListQuery {
   const statuses = parseList(params['status']);
   const categories = parseList(params['category']);
@@ -76,6 +96,7 @@ export function parseListQuery(params: RawParams, defaults: ListDefaults): ListQ
     // links and outlive releases; a removed one should degrade, not produce an error page.
     sort: isSort(sort) ? sort : defaults.sort,
     page: parsePage(params['page']),
+    pageSize: parsePageSize(params['pageSize']),
   };
 }
 
@@ -98,7 +119,19 @@ export function toQueryParams(query: ListQuery, defaults: ListDefaults): RawPara
     mine: query.mine ? 'true' : null,
     sort: query.sort === defaults.sort ? null : query.sort,
     page: query.page > 1 ? String(query.page) : null,
+    pageSize: query.pageSize === DEFAULT_PAGE_SIZE ? null : String(query.pageSize),
   };
+}
+
+/**
+ * How many pages the current result set spans.
+ *
+ * Zero results is one page, not zero: the pager reads "Page 1 of 1" rather than
+ * "Page 1 of 0", and a page number larger than this is how the list knows it has been
+ * asked for something past the end.
+ */
+export function pageCount(total: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(total / pageSize));
 }
 
 /** Whether anything is narrowing the list — drives the "clear filters" affordance and the

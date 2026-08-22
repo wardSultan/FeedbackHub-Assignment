@@ -30,6 +30,50 @@
       </div>
     </article>
 
+    @if (canTriage()) {
+      <!-- Triage. Shown to administrators as a convenience; the API re-checks the role on
+           every one of these calls, so hiding the panel is presentation, not protection. -->
+      <section class="triage" aria-labelledby="triage-heading">
+        <h2 id="triage-heading">
+          <mat-icon aria-hidden="true">shield_person</mat-icon>
+          Administration
+        </h2>
+
+        @if (triageError()) {
+          <p class="inline-error" role="alert">{{ triageError() }}</p>
+        }
+
+        <div class="triage-controls">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-field">
+            <mat-label>Status</mat-label>
+            <mat-select [value]="item.status.slug" [disabled]="triaging()"
+                        (valueChange)="setStatus($event)">
+              @for (status of assignableStatuses(); track status.slug) {
+                <mat-option [value]="status.slug">{{ status.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button [disabled]="triaging()" (click)="togglePinned()"
+                  [attr.aria-pressed]="item.isPinned">
+            <mat-icon>{{ item.isPinned ? 'keep_off' : 'keep' }}</mat-icon>
+            {{ item.isPinned ? 'Unpin' : 'Pin to top' }}
+          </button>
+
+          <button mat-stroked-button class="danger" [disabled]="triaging()"
+                  (click)="deleteRequest()">
+            <mat-icon>delete</mat-icon>
+            Delete request
+          </button>
+        </div>
+
+        <p class="triage-hint">
+          Pinned requests lead the board under every sort. Deleting keeps the discussion
+          intact for anyone who contributed to it, and removes the request from the board.
+        </p>
+      </section>
+    }
+
     @if (commentsEnabled()) {
       <section class="discussion" aria-labelledby="discussion-heading">
         <h2 id="discussion-heading">Discussion</h2>

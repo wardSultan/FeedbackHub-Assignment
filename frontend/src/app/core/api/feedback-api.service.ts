@@ -34,8 +34,11 @@ export class FeedbackApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${inject(RUNTIME_CONFIG).apiUrl}/api/v1`;
 
-  list(query: ListQuery, pageSize: number): Observable<Paged<FeedbackRequestView>> {
-    let params = new HttpParams().set('page', query.page).set('pageSize', pageSize);
+  list(query: ListQuery): Observable<Paged<FeedbackRequestView>> {
+    // Page size travels with the rest of the query rather than as a separate argument, so
+    // there is one description of the current view and no way for a caller to request a
+    // size the URL does not reflect.
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
 
     if (query.q) params = params.set('q', query.q);
     if (query.mine) params = params.set('mine', 'true');
@@ -72,5 +75,30 @@ export class FeedbackApiService {
     categorySlug: string;
   }): Observable<FeedbackRequestView> {
     return this.http.post<FeedbackRequestView>(`${this.base}/requests`, body);
+  }
+
+  /**
+   * Triage: move a request to another status. Administrators only.
+   *
+   * Separate from `update` rather than a field on it, mirroring the API: editing your own
+   * wording and deciding what the product team will do about it are different acts with
+   * different authorization, and one endpoint carrying both would have to re-decide per
+   * field. Each returns the whole updated request, so the caller replaces its copy rather
+   * than patching fields and hoping the two agree.
+   */
+  setStatus(id: string, statusSlug: string): Observable<FeedbackRequestView> {
+    return this.http.patch<FeedbackRequestView>(`${this.base}/requests/${id}/status`, {
+      statusSlug,
+    });
+  }
+
+  /** Pin or unpin. Pinned requests lead the board under every sort. Administrators only. */
+  setPinned(id: string, pinned: boolean): Observable<FeedbackRequestView> {
+    return this.http.patch<FeedbackRequestView>(`${this.base}/requests/${id}/pin`, { pinned });
+  }
+
+  /** Soft-delete. The author may remove their own; an administrator may remove any. */
+  remove(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/requests/${id}`);
   }
 }

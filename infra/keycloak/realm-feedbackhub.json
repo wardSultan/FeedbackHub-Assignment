@@ -68,6 +68,26 @@
       "directAccessGrantsEnabled": false
     }
   ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": "${GOOGLE_SSO_ENABLED:false}",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${GOOGLE_CLIENT_ID:not-configured}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET:not-configured}",
+        "defaultScope": "openid profile email",
+        "syncMode": "IMPORT",
+        "useJwksUrl": "true"
+      }
+    }
+  ],
   "users": [
     {
       "username": "admin@feedbackhub.local",

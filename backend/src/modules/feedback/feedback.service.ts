@@ -58,7 +58,7 @@ export class FeedbackService {
       throw new BadRequestException('Filtering by your own requests requires signing in.');
     }
 
-    const rows = await this.repository.list({
+    const filters = {
       viewerId: principal?.userId ?? null,
       statuses: query.status?.length ? query.status : null,
       categories: query.category?.length ? query.category : null,
@@ -70,9 +70,20 @@ export class FeedbackService {
       sort: query.sort ?? 'NEWEST',
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
-    });
+    } as const;
 
-    const total = rows.length > 0 ? Number(rows[0]!.total_count) : 0;
+    const rows = await this.repository.list(filters);
+
+    // The window function carries the total on every row, so the common case costs no
+    // extra query. A page past the end returns no rows to carry it, and only then is the
+    // count worth a second round trip — reporting zero there would tell a client the
+    // board is empty when it is merely finished.
+    const total =
+      rows.length > 0
+        ? Number(rows[0]!.total_count)
+        : query.page > 1
+          ? await this.repository.count(filters)
+          : 0;
 
     return {
       items: rows.map((row) => this.toView(row, principal)),
@@ -227,7 +238,9 @@ export class FeedbackService {
   ): Promise<FeedbackRequestView> {
     await this.requireExisting(id);
 
-    const status = await this.prisma.status.findFirst({ where: { slug: statusSlug, isActive: true } });
+    const status = await this.prisma.status.findFirst({
+      where: { slug: statusSlug, isActive: true },
+    });
     if (!status) {
       throw new BadRequestException({
         message: 'The status could not be changed.',

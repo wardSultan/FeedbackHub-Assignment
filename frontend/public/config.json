@@ -2,6 +2,7 @@
   "apiUrl": "http://localhost:3000",
   "keycloak": {
     "issuer": "http://localhost:8080/realms/feedbackhub",
-    "clientId": "feedbackhub-web"
+    "clientId": "feedbackhub-web",
+    "googleSso": true
   }
 }

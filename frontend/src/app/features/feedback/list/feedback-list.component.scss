@@ -31,6 +31,26 @@
   margin-bottom: 1rem;
 }
 
+/* Label and chips read as one control. `align-items: center` keeps the label on the
+   chips' centre line rather than floating above a row that wraps. */
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: var(--fh-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  /* Never the thing that wraps — the label leaving its chips behind is worse than a
+     slightly wider row. */
+  white-space: nowrap;
+}
+
 .filters-trailing {
   display: flex;
   align-items: center;
@@ -40,11 +60,23 @@
 
 .sort-field { width: 11rem; }
 
+/* The count and the per-page control share a row: both describe the result set, and the
+   control sits where the reader is already looking to see how big that set is. */
+.result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
 .result-count {
-  margin: 0 0 0.75rem;
+  margin: 0;
   color: var(--fh-text-muted);
   font-size: 0.9rem;
 }
+
+.page-size-field { width: 6.5rem; }
 
 .request-list {
   list-style: none;
@@ -58,13 +90,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  /* Wraps rather than overflowing: five controls do not fit a narrow viewport in a row. */
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 1.5rem;
   color: var(--fh-text-muted);
 }
 
+.pager-position {
+  /* Fixed width so the buttons either side do not shift as the digits change. */
+  min-width: 8rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 700px) {
   .board-header { flex-direction: column; }
+  .result-bar { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .filter-group { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
   .filters-trailing { margin-left: 0; width: 100%; }
   .sort-field { flex: 1; }
 }
